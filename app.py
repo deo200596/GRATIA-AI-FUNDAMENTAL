@@ -3,12 +3,20 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
+import time
 
 # 1. PENGATURAN HALAMAN WEBSITE UTAMA
 st.set_page_config(page_title="Sistem Trading Harian BEI", layout="wide")
 
+# FITUR REFRESH OTOMATIS 10 DETIK
+st.sidebar.subheader("⏱️ Kontrol Sinkronisasi Bursa")
+auto_refresh = st.sidebar.checkbox("Aktifkan Auto-Refresh (10 Detik)", value=True)
+
+if auto_refresh:
+    st.empty() 
+
 st.title("⚡ Sistem AI Scalping & Kontrol Risiko Harian (LQ45 & Kompas100)")
-st.write("Aplikasi acuan momentum trading cepat dan harian menggunakan live price streaming bursa efek.")
+st.write(f"Aplikasi acuan momentum trading cepat. Terakhir Diperbarui: {time.strftime('%H:%M:%S')} WIB")
 
 st.markdown("---")
 
@@ -61,7 +69,6 @@ saham_lq45 = [
 # STRUKTUR TAB MENU UTAMA WEB
 tab_dashboard, tab_sop = st.tabs(["⚡ Dashboard Scalping & Trading Harian", "📋 Panduan SOP Scalping"])
 with tab_dashboard:
-    # MEMBACA DATA SAHAM DARI BASE CSV LOKAL
     try:
         df_raw = pd.read_csv('data_kompas100.csv')
         df_raw['Sektor_Industri'] = df_raw['Ticker'].map(sektor_saham).fillna('Industri Lainnya')
@@ -69,7 +76,6 @@ with tab_dashboard:
         st.error("File data_kompas100.csv tidak ditemukan di direktori Anda.")
         st.stop()
 
-    # PILIHAN FILTER INDEKS BURSA
     pilihan_indeks = st.radio("Pilih Indeks Acuan Trading:", options=["Saham Unggulan LQ45", "Saham Likuid Kompas100"], horizontal=True)
     
     if pilihan_indeks == "Saham Unggulan LQ45":
@@ -80,10 +86,10 @@ with tab_dashboard:
     total_saham = len(df_filter)
     st.metric(f"Total Saham Siap Di-scalping ({pilihan_indeks})", f"{total_saham} Emiten Aktif")
 
-    # STREAMING DATA HARGA LIVE
+    # STREAMING DATA HARGA & VOLUME LIVE
     list_ticker_jk = [f"{t}.JK" for t in df_filter['Ticker'].tolist()]
     
-    @st.cache_data(ttl=30) # Segarkan data scalping setiap 30 detik untuk akurasi day trading
+    @st.cache_data(ttl=10) 
     def unduh_harga_scalping_live(tickers):
         try:
             return yf.download(tickers, period="1d", interval="1m", actions=False, multi_level_index=False)
@@ -94,16 +100,29 @@ with tab_dashboard:
     
     kamus_harga_live = {}
     kamus_perubahan = {}
+    kamus_volume = {}
     kamus_momentum = {}
 
     for t in df_filter['Ticker']:
         ticker_full = f"{t}.JK"
         harga_terakhir = None
+        volume_terakhir = 0
         
-        if not data_bursa.empty and ticker_full in data_bursa.columns:
-            series_close = data_bursa[ticker_full].dropna()
-            if not series_close.empty:
-                harga_terakhir = int(round(series_close.iloc[-1]))
+        if not data_bursa.empty:
+            if ticker_full in data_bursa.columns:
+                series_close = data_bursa[ticker_full].dropna()
+                if not series_close.empty:
+                    harga_terakhir = int(round(series_close.iloc[-1]))
+            
+            if ('Volume', ticker_full) in data_bursa.columns:
+                series_vol = data_bursa[('Volume', ticker_full)].dropna()
+                if not series_vol.empty:
+                    volume_terakhir = int(series_vol.sum())
+            elif 'Volume' in data_bursa.columns:
+                if t in data_bursa['Volume'].columns:
+                    series_vol = data_bursa['Volume'][t].dropna()
+                    if not series_vol.empty:
+                        volume_terakhir = int(series_vol.iloc[-1])
 
         if harga_terakhir is not None and harga_terakhir > 0:
             harga_basis = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].values[0])
@@ -116,32 +135,34 @@ with tab_dashboard:
 
         kamus_harga_live[t] = harga_terakhir
         kamus_perubahan[t] = selisih
+        kamus_volume[t] = volume_terakhir
         kamus_momentum[t] = status_mo
 
     df_filter['Harga_Live_Pasar'] = df_filter['Ticker'].map(kamus_harga_live)
     df_filter['Fluktuasi_Harga'] = df_filter['Ticker'].map(kamus_perubahan)
+    df_filter['Volume_Transaksi'] = df_filter['Ticker'].map(kamus_volume)
 
-    with st.expander(f"🔍 Papan Monitor Trading & Selisih Harga Terkini - {pilihan_indeks}", expanded=True):
+    with st.expander(f"🔍 Papan Monitor Trading & Likuiditas Bandar - {pilihan_indeks}", expanded=True):
         def beri_warna_fluktuasi(val):
             if val > 0: return 'color: #00cc66; font-weight: bold;'
             elif val < 0: return 'color: #ff3333; font-weight: bold;'
             return 'color: #888888;'
             
         st.dataframe(
-            df_filter[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Live_Pasar', 'Fluktuasi_Harga']].style.map(beri_warna_fluktuasi, subset=['Fluktuasi_Harga']),
+            df_filter[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Live_Pasar', 'Fluktuasi_Harga', 'Volume_Transaksi']].style.map(beri_warna_fluktuasi, subset=['Fluktuasi_Harga']),
             column_config={
                 "Ticker": st.column_config.TextColumn("Kode Saham"),
                 "Nama": st.column_config.TextColumn("Nama Perusahaan"),
                 "Sektor_Industri": st.column_config.TextColumn("Sektor Industri"),
                 "Harga_Live_Pasar": st.column_config.NumberColumn("Harga Terkini", format="Rp %d"),
-                "Fluktuasi_Harga": st.column_config.NumberColumn("Selisih Transaksi", format="Rp %+d")
+                "Fluktuasi_Harga": st.column_config.NumberColumn("Selisih Transaksi", format="Rp %+d"),
+                "Volume_Transaksi": st.column_config.NumberColumn("Volume Live (Lembar)", format="%d")
             },
             width='stretch', hide_index=True
         )
     st.markdown("---")
     st.subheader("📋 Kalkulator Kontrol Risiko & Rekomendasi Portofolio Trading Harian")
 
-    # MEMBUAT KALKULATOR TRADING KILAT UNTUK SELURUH EMITEN INDEKS
     df_trading = df_filter.copy()
     df_trading['Harga_Beli_Masuk'] = df_trading['Ticker'].map(kamus_harga_live)
     df_trading['Porsi_Modal_Maks'] = "30% Maks"
@@ -154,7 +175,7 @@ with tab_dashboard:
         df_trading = df_trading[df_trading['Ticker'].str.contains(cari_saham)]
 
     st.dataframe(
-        df_trading[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Beli_Masuk', 'Porsi_Modal_Maks', 'Harga_Jual_TP_3%', 'Harga_Jual_CL_2%', 'Status_Momentum_Live']],
+        df_trading[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Beli_Masuk', 'Porsi_Modal_Maks', 'Harga_Jual_TP_3%', 'Harga_Jual_CL_2%', 'Volume_Transaksi', 'Status_Momentum_Live']],
         column_config={
             "Ticker": st.column_config.TextColumn("Kode"),
             "Nama": st.column_config.TextColumn("Nama Emiten"),
@@ -163,6 +184,7 @@ with tab_dashboard:
             "Porsi_Modal_Maks": st.column_config.TextColumn("Porsi Modal"),
             "Harga_Jual_TP_3%": st.column_config.NumberColumn("Target TP (3%)", format="Rp %d"),
             "Harga_Jual_CL_2%": st.column_config.NumberColumn("Cut Loss (2%)", format="Rp %d"),
+            "Volume_Transaksi": st.column_config.NumberColumn("Vol Bandar", format="%d"),
             "Status_Momentum_Live": st.column_config.TextColumn("Status Momentum")
         },
         width='stretch', hide_index=True
@@ -177,10 +199,10 @@ with tab_dashboard:
     st.markdown("---")
     st.subheader("🕯️ Analisis Grafik Candlestick Pro & Garis MA (3 Bulan)")
     
-    # PERBAIKAN TOTAL: Seluruh emiten di indeks kini masuk ke dalam dropdown menu grafik tanpa terkecuali
     pilihan_saham_grafik = st.selectbox("Pilih Kode Saham Untuk Grafik Teknis:", options=sorted(df_filter['Ticker'].unique()))
     if pilihan_saham_grafik:
         try:
+            # PERBAIKAN FATAL BARIS 210: Variabel typo dibuang, pemanggilan dipaksa skalar murni
             data_hist = yf.download(f"{pilihan_saham_grafik}.JK", period="3mo", interval="1d", multi_level_index=False)
             if not data_hist.empty:
                 df_tek = data_hist[['Open', 'High', 'Low', 'Close']].dropna().copy()
@@ -199,28 +221,16 @@ with tab_dashboard:
 # === TAB MENU UTAMA KEDUA: SOP TRADING HARIAN / SCALPING ===
 with tab_sop:
     st.header("⚡ SOP Eksekusi Trading Harian (Scalping) Otomatis")
-    
-    st.components.v1.html("""
-    <div style="background-color: #0e1117; padding: 20px; border-radius: 10px; font-family: sans-serif; color: white;">
-        <div style="display: flex; flex-direction: column; align-items: center;">
-            <div style="border: 2px solid #00cc66; padding: 10px; border-radius: 5px; background-color: #1a231a; text-align: center; width: 250px;"><b>1. PANTAU MOMENTUM SCALPING</b><br>Cari Saham Berstatus "🟢 SCALPING BUY"</div>
-            <div style="font-size: 20px; margin: 5px;">⬇️</div>
-            <div style="border: 2px solid #ffaa00; padding: 10px; border-radius: 5px; background-color: #1a1c23; text-align: center; width: 250px;"><b>2. CEK TEKNIKAL GRAFIK</b><br>Candlestick di Atas MA5 & MA20</div>
-            <div style="font-size: 20px; margin: 5px;">⬇️</div>
-            <div style="border: 2px solid #00ccff; padding: 10px; border-radius: 5px; background-color: #1a1c23; text-align: center; width: 250px;"><b>3. MASUK POSISI (MAKS 30%)</b><br>Eksekusi Cepat di Harga Live Pasar</div>
-            <div style="font-size: 20px; margin: 5px;">⬇️</div>
-            <div style="display: flex; justify-content: space-around; width: 100%; margin-top: 10px;">
-                <div style="border: 2px solid #00cc66; padding: 10px; border-radius: 5px; background-color: #1a231a; text-align: center; width: 200px;"><b>TAKE PROFIT (TP)</b><br>Jual Kilat saat Profit Naik ≥ 3%</div>
-                <div style="border: 2px solid #ff3333; padding: 10px; border-radius: 5px; background-color: #231a1a; text-align: center; width: 200px;"><b>CUT LOSS (CL)</b><br>Disiplin Keluar saat Rugi Meleset ≤ 2%</div>
-            </div>
-        </div>
-    </div>
-    """, height=300)
-
     st.markdown("""
     ### 🛡️ Aturan Utama Kerja Trader Harian Kilat:
-    1. **Saringan Saham:** Hanya eksekusi emiten yang memiliki status **🟢 SCALPING BUY (Bullish)** pada tabel kalkulator kontrol risiko.
-    2. **Pembatasan Modal:** Maksimal dana satu saham adalah **30% dari total modal siap pakai** untuk mencegah risiko penurunan mendadak (*floating loss* besar).
-    3. **Disiplin Ambil Keuntungan:** Pasang *Sell Order* secara otomatis pada harga yang tertera di kolom **Target TP (3%)**. Begitu tersentuh, segera amankan keuntungan tunai Anda.
-    4. **Disiplin Batasi Kerugian:** Jika pergerakan pasar berbalik arah menentang posisi Anda, wajib pasang *Stop Loss* otomatis di nominal kolom **Cut Loss (2%)** demi menyelamatkan modal trading Anda dari kejatuhan yang dalam.
+    1. **Deteksi Likuiditas Bandar:** Urutkan tabel berdasarkan kolom **Volume Transaksi / Vol Bandar** tertinggi. Saham dengan volume jutaan lembar mendandakan emiten sedang ramai diperdagangkan secara aktif [INDEX].
+    2. **Saringan Saham:** Hanya eksekusi emiten yang memiliki status **🟢 SCALPING BUY (Bullish)**.
+    3. **Pembatasan Modal:** Maksimal dana satu saham adalah **30% dari total modal siap pakai** [INDEX].
+    4. **Disiplin Ambil Keuntungan:** Pasang *Sell Order* secara otomatis pada harga yang tertera di kolom **Target TP (3%)** [INDEX].
+    5. **Disiplin Batasi Kerugian:** Wajib pasang *Stop Loss* otomatis di nominal kolom **Cut Loss (2%)** [INDEX].
     """)
+
+# SINKRONISASI PENGULANG 10 DETIK
+if auto_refresh:
+    time.sleep(10)
+    st.rerun()
