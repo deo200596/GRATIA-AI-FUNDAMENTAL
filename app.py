@@ -136,7 +136,14 @@ if df_final is not None:
         },
         hide_index=True, use_container_width=True
     )
-    
+    # FITUR UNDUH LAPORAN EXCEL LANGSUNG DARI HP
+st.download_button(
+    label="📥 Unduh Daftar Saham Rekomendasi AI (CSV)",
+    data=df_tampilan.to_csv(index=False).encode('utf-8'),
+    file_name='rekomendasi_saham_ai.csv',
+    mime='text/csv',
+)
+
     # === FITUR PREMIUM: GRAFIK CANDLESTICK INTERAKTIF + MA5 + MA20 ===
     st.markdown("---")
     st.subheader("🕯️ Analisis Grafik Candlestick Pro & Garis MA (3 Bulan)")
