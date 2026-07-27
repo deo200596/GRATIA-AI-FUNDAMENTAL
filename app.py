@@ -3,23 +3,13 @@ import pandas as pd
 import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
-import asyncio
-import sys
 
-# PERBAIKAN 1: Menghilangkan DeprecationWarning dengan penanganan loop modern Python 3.14+
-if sys.platform == 'win32':
-    try:
-        # Menggunakan loop dasar Windows tanpa memicu fungsi policy usang
-        asyncio.get_event_loop_policy().get_event_loop()
-    except RuntimeError:
-        # Jika loop belum terbentuk, buat baru secara aman
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
+# 1. PENGATURAN HALAMAN WEBSITE
 st.set_page_config(page_title="AI Analisis Saham BEI", layout="wide")
 
 st.title("🤖 Sistem AI Prediksi & Penyaring Saham BEI")
-st.write("Aplikasi acuan investasi jangka menengah-panjang berbasis Kombinasi Sektor Fundamental & Asinkronus Teknikal.")
+st.write("Aplikasi acuan investasi jangka menengah dan panjang berbasis Kombinasi Sektor Fundamental & Teknikal Klasik.")
+
 st.markdown("---")
 
 # DATA KAMUS SEKTOR INDUSTRI RESMI BEI
@@ -68,6 +58,7 @@ saham_lq45 = [
     'TOWR', 'TPIA', 'UNTR', 'UNVR', 'XL'
 ]
 
+# 2. FUNGSI MEMUAT DATA LAPORAN KEUANGAN LOKAL
 def muat_data_dasar():
     try:
         df_raw = pd.read_csv('data_kompas100.csv')
@@ -75,8 +66,7 @@ def muat_data_dasar():
         df_raw['Sektor_Industri'] = df_raw['Ticker'].map(sektor_saham).fillna('Industri Lainnya')
         df_final['Sektor_Industri'] = df_final['Ticker'].map(sektor_saham).fillna('Industri Lainnya')
         return df_raw, df_final
-    except Exception as e:
-        st.error(f"🚨 Gagal membaca struktur tabel data lokal: {str(e)}")
+    except FileNotFoundError:
         return None, None
 
 df_raw, df_final = muat_data_dasar()
@@ -85,16 +75,11 @@ def beri_warna_fluktuasi(val):
     if val > 0: return 'color: #00cc66; font-weight: bold;'
     elif val < 0: return 'color: #ff3333; font-weight: bold;'
     else: return 'color: #888888;'
-
-async def unduh_jaringan_async(list_ticker):
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, lambda: yf.download(list_ticker, period="1d", interval="1m", verbose=False))
 if df_final is not None:
     st.subheader("📊 Pilih Cakupan Indeks Bursa")
-    pilihan_indeks = st.radio(
-        "Tampilkan data berdasarkan indeks:",
-        options=["Saham Unggulan LQ45", "Saham Likuid Kompas100"],
-        horizontal=True
+    pilihan_indeks = st.sidebar.radio(
+        "Pilih Indeks Bursa:",
+        options=["Saham Unggulan LQ45", "Saham Likuid Kompas100"]
     )
     
     if pilihan_indeks == "Saham Unggulan LQ45":
@@ -111,63 +96,53 @@ if df_final is not None:
     col1.metric(f"Total Saham Dipantau ({pilihan_indeks})", f"{total_saham} Emiten")
     col2.metric("Rekomendasi STRONG BUY AI", f"{strong_buy} Emiten")
     
-    @st.fragment
-    def render_tabel_live_fragment(df_input):
-        with st.expander(f"🔍 Lihat Daftar Emiten & Harga Live - {pilihan_indeks}"):
-            st.write("Mengambil harga terkini langsung dari bursa secara asinkronus...")
-            list_ticker_jk = [f"{t}.JK" for t in df_input['Ticker'].tolist()]
+    # === SOLUSI TOTAL PENARIKAN LIVE DATA TERINTEGRASI CLOUD ===
+    with st.expander(f"🔍 Lihat Daftar Emiten & Harga Live - {pilihan_indeks}", expanded=True):
+        st.write("Menghubungkan ke server pasar bursa global...")
+        list_ticker_jk = [f"{t}.JK" for t in df_filter_indeks_raw['Ticker'].tolist()]
+        
+        try:
+            # Gunakan penarikan riwayat harian tercepat (Metode non-async aman cloud)
+            data_download = yf.download(list_ticker_jk, period="2d", group_by='ticker')
             
-            try:
-                data_pasar = asyncio.run(unduh_jaringan_async(list_ticker_jk))
-                list_harga_live = []
-                list_perubahan = []
+            list_harga_live = []
+            list_perubahan = []
+            
+            for t in df_filter_indeks_raw['Ticker']:
+                ticker_full = f"{t}.JK"
+                try:
+                    # Ambil harga baris terakhir (penutupan menit ini) secara murni skalar
+                    harga_terakhir = int(round(data_download[ticker_full]['Close'].dropna().iloc[-1]))
+                    harga_basis = int(df_filter_indeks_raw[df_filter_indeks_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
+                    selisih = harga_terakhir - harga_basis
+                except:
+                    harga_terakhir = int(df_filter_indeks_raw[df_filter_indeks_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
+                    selisih = 0
                 
-                for t in df_input['Ticker']:
-                    ticker_full = f"{t}.JK"
-                    harga_terakhir = None
-                    
-                    for col in data_pasar.columns:
-                        if isinstance(col, tuple) and len(col) == 2 and col == 'Close' and col == ticker_full:
-                            series_valid = data_pasar[col].dropna()
-                            if not series_valid.empty:
-                                harga_terakhir = int(round(series_valid.iloc[-1]))
-                                break
-                    
-                    if harga_terakhir is not None and harga_terakhir > 0:
-                        harga_basis = int(df_input[df_input['Ticker'] == t]['Harga_Sekarang'].values)
-                        selisih = harga_terakhir - harga_basis
-                    else:
-                        harga_terakhir = int(df_input[df_input['Ticker'] == t]['Harga_Sekarang'].values)
-                        selisih = 0
-                        
-                    list_harga_live.append(harga_terakhir)
-                    list_perubahan.append(selisih)
-                
-                df_tabel_live = df_input[['Ticker', 'Nama', 'Sektor_Industri']].copy()
-                df_tabel_live['Harga_Live_Pasar'] = list_harga_live
-                df_tabel_live['Fluktuasi_Harga'] = list_perubahan
-                df_tabel_live = df_tabel_live.sort_values(by='Ticker').reset_index(drop=True)
-                
-                # PERBAIKAN 2: Mengganti use_container_width=True menjadi width='stretch' sesuai aturan Streamlit terbaru
-                st.dataframe(
-                    df_tabel_live.style.map(beri_warna_fluktuasi, subset=['Fluktuasi_Harga']), 
-                    column_config={
-                        "Ticker": st.column_config.TextColumn("Kode Saham"),
-                        "Nama": st.column_config.TextColumn("Nama Perusahaan"),
-                        "Sektor_Industri": st.column_config.TextColumn("Sektor Industri"),
-                        "Harga_Live_Pasar": st.column_config.NumberColumn("Harga Terkini (Live)", format="Rp %d"),
-                        "Fluktuasi_Harga": st.column_config.NumberColumn("Fluktuasi Real-Time", format="Rp %+d")
-                    },
-                    width='stretch', hide_index=True
-                )
-            except Exception as error_jaringan:
-                st.warning("⚠️ Fitur streaming live dialihkan ke lokal karena jaringan pasar sedang istirahat.")
-                st.dataframe(df_input[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Sekarang']].sort_values(by='Ticker'), width='stretch', hide_index=True)
-
-    render_tabel_live_fragment(df_filter_indeks_raw)
+                list_harga_live.append(harga_terakhir)
+                list_perubahan.append(selisih)
+            
+            df_tabel_live = df_filter_indeks_raw[['Ticker', 'Nama', 'Sektor_Industri']].copy()
+            df_tabel_live['Harga_Live_Pasar'] = list_harga_live
+            df_tabel_live['Fluktuasi_Harga'] = list_perubahan
+            df_tabel_live = df_tabel_live.sort_values(by='Ticker').reset_index(drop=True)
+            
+            st.dataframe(
+                df_tabel_live.style.map(beri_warna_fluktuasi, subset=['Fluktuasi_Harga']), 
+                column_config={
+                    "Ticker": st.column_config.TextColumn("Kode Saham"),
+                    "Nama": st.column_config.TextColumn("Nama Perusahaan"),
+                    "Sektor_Industri": st.column_config.TextColumn("Sektor Industri"),
+                    "Harga_Live_Pasar": st.column_config.NumberColumn("Harga Terkini (Live)", format="Rp %d"),
+                    "Fluktuasi_Harga": st.column_config.NumberColumn("Fluktuasi Real-Time", format="Rp %+d")
+                },
+                width='stretch', hide_index=True
+            )
+        except Exception as e:
+            st.warning("Menampilkan data historis karena pembatasan sementara dari server bursa.")
+            st.dataframe(df_filter_indeks_raw[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Sekarang']].sort_values(by='Ticker'), width='stretch', hide_index=True)
             
     st.markdown("---")
-    
     st.subheader("📋 Daftar Portofolio Rekomendasi AI")
     cari_saham = st.text_input("🔍 Cari Kode Saham (Contoh: BBCA, TLKM, ASII):").upper().strip()
     
@@ -175,7 +150,6 @@ if df_final is not None:
     if cari_saham:
         df_tampilan = df_tampilan[df_tampilan['Ticker'].str.contains(cari_saham)]
         
-    # PERBAIKAN 3: Menggunakan width='stretch' untuk tabel portofolio AI
     st.dataframe(
         df_tampilan,
         column_config={
@@ -235,7 +209,6 @@ if df_final is not None:
                     xaxis_rangeslider_visible=False, template="plotly_dark", height=500,
                     margin=dict(l=10, r=10, t=40, b=10)
                 )
-                # PERBAIKAN 4: Menggunakan width='stretch' untuk grafik plotly chart
                 st.plotly_chart(fig, width='stretch')
             else:
                 st.warning("⚠️ Data transaksi historis dari server Yahoo kosong untuk emiten ini.")
