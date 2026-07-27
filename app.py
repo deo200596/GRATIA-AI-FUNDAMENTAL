@@ -66,6 +66,16 @@ saham_lq45 = [
     'TOWR', 'TPIA', 'UNTR', 'UNVR', 'XL'
 ]
 
+def hitung_rsi_live(series, period=14):
+    if len(series) < period: return 50.0
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
+    avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    return (100 - (100 / (1 + rs))).iloc[-1]
+
 tab_dashboard, tab_sop, tab_spike = st.tabs([
     "⚡ Dashboard Scalping & Trading Harian", 
     "📋 Panduan SOP Scalping",
@@ -89,14 +99,12 @@ with tab_dashboard:
     total_saham = len(df_filter)
     st.metric(f"Total Saham Siap Di-scalping ({pilihan_indeks})", f"{total_saham} Emiten Aktif")
 
-    # STREAMING DATA HARGA & VOLUME LIVE
     list_ticker_jk = [f"{t}.JK" for t in df_filter['Ticker'].tolist()]
     
     @st.cache_data(ttl=10) 
     def unduh_harga_scalping_live(tickers):
         try:
-            # Mengunduh data 2 hari terakhir untuk menghitung MA secara otomatis di latar belakang
-            return yf.download(tickers, period="5d", interval="1d", actions=False, multi_level_index=False)
+            return yf.download(tickers, period="25d", interval="1d", actions=False, multi_level_index=False)
         except:
             return pd.DataFrame()
 
@@ -106,44 +114,45 @@ with tab_dashboard:
     kamus_perubahan = {}
     kamus_volume = {}
     kamus_momentum = {}
-    kamus_sinyal_ma = {} # Menampung sinyal Golden Cross otomatis
+    kamus_sinyal_ma = {}
+    kamus_rsi = {}
 
     for t in df_filter['Ticker']:
         ticker_full = f"{t}.JK"
         harga_terakhir = None
         volume_terakhir = 0
         sinyal_ma = "⚪ NEUTRAL"
+        rsi_sekarang = 50.0
         
-        if not data_bursa.empty:
-            if ticker_full in data_bursa.columns:
-                series_close = data_bursa[ticker_full].dropna()
-                if not series_close.empty:
-                    harga_terakhir = int(round(series_close.iloc[-1]))
-                    
-                    # === UPGRADE ALGORITMA: HITUNG LIVE MA5 DAN MA20 UNTUK TABEL UTAMA ===
-                    if len(series_close) >= 5:
-                        ma5_skrg = series_close.rolling(window=5).mean().iloc[-1]
-                        ma20_skrg = series_close.rolling(window=20).mean().iloc[-1] if len(series_close) >= 20 else ma5_skrg
-                        
-                        if ma5_skrg > ma20_skrg:
-                            sinyal_ma = "🔥 GOLDEN CROSS"
-                        elif ma5_skrg < ma20_skrg:
-                            sinyal_ma = "❄️ DEAD CROSS"
+        if not data_bursa.empty and ticker_full in data_bursa.columns:
+            series_close = data_bursa[ticker_full].dropna()
+            if not series_close.empty:
+                harga_terakhir = int(round(series_close.iloc[-1]))
+                
+                if len(series_close) >= 5:
+                    ma5_skrg = series_close.rolling(window=5).mean().iloc[-1]
+                    ma20_skrg = series_close.rolling(window=20).mean().iloc[-1] if len(series_close) >= 20 else ma5_skrg
+                    sinyal_ma = "🔥 GOLDEN CROSS" if ma5_skrg > ma20_skrg else "❄️ DEAD CROSS"
+                
+                rsi_sekarang = round(hitung_rsi_live(series_close, period=14), 1)
 
             if ('Volume', ticker_full) in data_bursa.columns:
                 series_vol = data_bursa[('Volume', ticker_full)].dropna()
-                if not series_vol.empty:
-                    volume_terakhir = int(series_vol.sum())
+                if not series_vol.empty: volume_terakhir = int(series_vol.sum())
             elif 'Volume' in data_bursa.columns:
                 if t in data_bursa['Volume'].columns:
                     series_vol = data_bursa['Volume'][t].dropna()
-                    if not series_vol.empty:
-                        volume_terakhir = int(series_vol.iloc[-1])
+                    if not series_vol.empty: volume_terakhir = int(series_vol.iloc[-1])
 
+        # PERBAIKAN TOTAL SIFAT ILOC (BARIS 159): Menambahkan [0] lurus agar tidak memicu error _iLocIndexer
         if harga_terakhir is not None and harga_terakhir > 0:
             harga_basis = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].iloc[0])
             selisih = harga_terakhir - harga_basis
-            status_mo = "🟢 SCALPING BUY" if selisih > 0 else ("🔴 AVOID (Bearish)" if selisih < 0 else "⚪ WAIT (Sideways)")
+            
+            if rsi_sekarang >= 70.0:
+                status_mo = "⚠️ OVERBOUGHT (Kemahalan)"
+            else:
+                status_mo = "🟢 SCALPING BUY" if selisih > 0 else ("🔴 AVOID (Bearish)" if selisih < 0 else "⚪ WAIT (Sideways)")
         else:
             harga_terakhir = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].iloc[0])
             selisih = 0
@@ -154,6 +163,7 @@ with tab_dashboard:
         kamus_volume[t] = volume_terakhir
         kamus_momentum[t] = status_mo
         kamus_sinyal_ma[t] = sinyal_ma
+        kamus_rsi[t] = rsi_sekarang
 
     df_filter['Harga_Live_Pasar'] = df_filter['Ticker'].map(kamus_harga_live)
     df_filter['Fluktuasi_Harga'] = df_filter['Ticker'].map(kamus_perubahan)
@@ -185,31 +195,24 @@ with tab_dashboard:
     st.write("🎯 **Panel Filter Pintar (Klik tombol untuk menyaring data otomatis):**")
     col_btn1, col_col2, col_btn3, col_btn4 = st.columns(4)
     
-    if 'filter_mode' not in st.session_state:
-        st.session_state.filter_mode = "NORMAL"
-
-    if col_btn1.button("📊 1) Urutkan Vol Bandar Tertinggi"):
-        st.session_state.filter_mode = "URUT_VOL"
-    if col_col2.button("⚠️ 2) Tampilkan Volume Palsu (< 50K)"):
-        st.session_state.filter_mode = "VOL_PALSU"
-    if col_btn3.button("🔥 3) Tampilkan Volume Valid (Akumulasi)"):
-        st.session_state.filter_mode = "VOL_VALID"
-    if col_btn4.button("🔄 Reset Tampilan Tabel"):
-        st.session_state.filter_mode = "NORMAL"
+    if 'filter_mode' not in st.session_state: st.session_state.filter_mode = "NORMAL"
+    if col_btn1.button("📊 1) Urutkan Vol Bandar Tertinggi"): st.session_state.filter_mode = "URUT_VOL"
+    if col_col2.button("⚠️ 2) Tampilkan Volume Palsu (< 50K)"): st.session_state.filter_mode = "VOL_PALSU"
+    if col_btn3.button("🔥 3) Tampilkan Volume Valid (Akumulasi)"): st.session_state.filter_mode = "VOL_VALID"
+    if col_btn4.button("🔄 Reset Tampilan Tabel"): st.session_state.filter_mode = "NORMAL"
 
     df_trading = df_filter.copy()
     df_trading['Harga_Beli_Masuk'] = df_trading['Ticker'].map(kamus_harga_live)
-    
     df_trading['Rupiah_Maks_Beli_30%'] = int(input_modal * 0.30)
     df_trading['Maks_Lot_Beli'] = (df_trading['Rupiah_Maks_Beli_30%'] / (df_trading['Harga_Beli_Masuk'] * 100)).fillna(0).astype(int)
     
-    # === SUNTIKAN INTEGRASI FITUR BARU BARIS KALKULATOR TARGET HARGA JUAL JANGKA PENDEK ===
     df_trading['Harga_Jual_TP1_3%'] = (df_trading['Harga_Beli_Masuk'] * 1.03).fillna(0).astype(int)
-    df_trading['Target_TP2_5%'] = (df_trading['Harga_Beli_Masuk'] * 1.05).fillna(0).astype(int) # Target Psikologis Bandar
+    df_trading['Target_TP2_5%'] = (df_trading['Harga_Beli_Masuk'] * 1.05).fillna(0).astype(int)
     df_trading['Harga_Jual_CL_2%'] = (df_trading['Harga_Beli_Masuk'] * 0.98).fillna(0).astype(int)
     
     df_trading['Status_Momentum_Live'] = df_trading['Ticker'].map(kamus_momentum)
-    df_trading['Sinyal_MA_Live'] = df_trading['Ticker'].map(kamus_sinyal_ma) # Sinyal Golden Cross Otomatis
+    df_trading['Sinyal_MA_Live'] = df_trading['Ticker'].map(kamus_sinyal_ma)
+    df_trading['RSI_14_Live'] = df_trading['Ticker'].map(kamus_rsi)
 
     if st.session_state.filter_mode == "URUT_VOL":
         df_trading = df_trading.sort_values(by='Volume_Transaksi', ascending=False)
@@ -222,9 +225,8 @@ with tab_dashboard:
     if cari_saham:
         df_trading = df_trading[df_trading['Ticker'].str.contains(cari_saham)]
 
-    # TAMPILKAN TABEL KOMPLET BARU DENGAN TARGET TP2 (5%) DAN SINYAL MA LIVE
     st.dataframe(
-        df_trading[['Ticker', 'Nama', 'Harga_Beli_Masuk', 'Rupiah_Maks_Beli_30%', 'Maks_Lot_Beli', 'Harga_Jual_TP1_3%', 'Target_TP2_5%', 'Harga_Jual_CL_2%', 'Sinyal_MA_Live', 'Status_Momentum_Live']],
+        df_trading[['Ticker', 'Nama', 'Harga_Beli_Masuk', 'Rupiah_Maks_Beli_30%', 'Maks_Lot_Beli', 'Harga_Jual_TP1_3%', 'Target_TP2_5%', 'Harga_Jual_CL_2%', 'RSI_14_Live', 'Sinyal_MA_Live', 'Status_Momentum_Live']],
         column_config={
             "Ticker": st.column_config.TextColumn("Kode"),
             "Nama": st.column_config.TextColumn("Nama Emiten"),
@@ -232,8 +234,9 @@ with tab_dashboard:
             "Rupiah_Maks_Beli_30%": st.column_config.NumberColumn("Dana 30%", format="Rp %d"),
             "Maks_Lot_Beli": st.column_config.NumberColumn("Maks (Lot)", format="%d Lot"),
             "Harga_Jual_TP1_3%": st.column_config.NumberColumn("TP 1 (3%)", format="Rp %d"),
-            "Target_TP2_5%": st.column_config.NumberColumn("Target TP 2 (5%)", format="Rp %d"),
+            "Target_TP2_5%": st.column_config.NumberColumn("TP 2 (5%)", format="Rp %d"),
             "Harga_Jual_CL_2%": st.column_config.NumberColumn("Cut Loss (2%)", format="Rp %d"),
+            "RSI_14_Live": st.column_config.NumberColumn("RSI (14)", format="%.1f"),
             "Sinyal_MA_Live": st.column_config.TextColumn("Tren MA"),
             "Status_Momentum_Live": st.column_config.TextColumn("Momentum")
         },
@@ -266,8 +269,7 @@ with tab_dashboard:
                 fig.add_trace(go.Scatter(x=df_tek.index, y=df_tek['MA20'], mode='lines', name='MA20 (Biru)', line=dict(color='#00bcff', width=2)))
                 fig.update_layout(xaxis_rangeslider_visible=False, template="plotly_dark", height=450, margin=dict(l=10, r=10, t=10, b=10))
                 st.plotly_chart(fig, width='stretch')
-        except Exception as e:
-            st.error(f"Gagal memproses grafik lilin: {e}")
+        except Exception as e: st.error(f"Gagal memproses grafik lilin: {e}")
 
 # === TAB MENU UTAMA KEDUA: SOP TRADING ===
 with tab_sop:
@@ -275,9 +277,9 @@ with tab_sop:
     st.markdown("""
     ### 🛡️ Aturan Utama Kerja Trader Harian Kilat:
     1. **Saringan Saham:** Gunakan tombol filter di dashboard utama untuk menyaring pergerakan bandar secara instan [INDEX].
-    2. **Pintu Masuk Terbaik:** Pilih saham dengan kombinasi status **🟢 SCALPING BUY** dan tren **🔥 GOLDEN CROSS** di tabel [INDEX].
-    3. **Pembatasan Modal:** Patuhi batasan nilai rupiah pada kolom **Porsi Dana 30%** [INDEX].
-    4. **Disiplin Keluar Pasar:** Pasang antrean jual otomatis mengikuti target nominal **TP 1 (3%)**, atau gunakan kolom **Target TP 2 (5%)** jika volume transaksi bandar meledak sangat besar hari ini [INDEX].
+    2. **Rem Darurat Jenuh Beli (RSI > 70):** Dilarang melakukan pembelian jika angka kolom **RSI (14)** berada di atas **70.0** atau status momentum berubah menjadi **⚠️ OVERBOUGHT** [INDEX]. 
+    3. **Pembatasan Modal:** Patuhi batasan nilai rupiah pada porsi dana 30% [INDEX].
+    4. **Disiplin Keluar Pasar:** Pasang antrean jual otomatis mengikuti target nominal **TP 1 (3%)**, atau gunakan **Target TP 2 (5%)** jika volume transaksi bandar meledak sangat besar [INDEX].
     """)
 
 # === TAB MENU UTAMA KETIGA: TAKTIK VOLUME SPIKE ===
@@ -285,7 +287,7 @@ with tab_spike:
     st.header("🕵️‍♂️ Taktik Volume Spike: Cara Mendeteksi Pergerakan Bandar Lewat Tabel")
     st.markdown("""
     ### 🚀 Panduan Penggunaan Panel Tombol Filter Pintar
-    * **Tombol Volume Valid:** Menampilkan saham yang murni sedang diakumulasi oleh bandar bursa modal raksasa [INDEX]. Target utama eksekusi *scalping* Anda [INDEX].
+    * **Tombol Volume Valid:** Menampilkan saham yang murni sedang diakumulasi oleh bandar bursa modal raksasa [INDEX]. Selalu pastikan nilai RSI di tabel masih berada di bawah angka 70 sebelum melakukan klik eksekusi masuk [INDEX].
     """)
 
 # SINKRONISASI PENGULANG 10 DETIK
