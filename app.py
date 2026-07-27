@@ -57,13 +57,29 @@ saham_lq45 = [
     'MDKA', 'MEDC', 'MIKA', 'MYOR', 'PGAS', 'PTBA', 'SIDO', 'SMGR', 'SMRA', 'TLKM', 
     'TOWR', 'TPIA', 'UNTR', 'UNVR', 'XL'
 ]
-# 2. FUNGSI UNTUK MEMBACA DATA LOKAL
+
+# 2. FUNGSI UNTUK MEMBACA DATA LOKAL & LOGIKAL KALKULASI TARGET INVESTASI
 def muat_data_dasar():
     try:
         df_raw = pd.read_csv('data_kompas100.csv')
         df_final = pd.read_csv('keputusan_final_ai_saham.csv')
+        
         df_raw['Sektor_Industri'] = df_raw['Ticker'].map(sektor_saham).fillna('Industri Lainnya')
         df_final['Sektor_Industri'] = df_final['Ticker'].map(sektor_saham).fillna('Industri Lainnya')
+        
+        # === INTEGRASI KALKULASI RUMUS OTOMATIS FITUR PERMINTAAN USER ===
+        # 1) Fitur Rekomendasi Harga Beli = Diambil dari Harga Sekarang/Harga Model Terakhir
+        df_final['Rekomendasi_Harga_Beli'] = df_final['Harga_Sekarang']
+        
+        # 4) Maksimal Beli = 30% dari Porsi Modal Pembelian Pertama
+        df_final['Maks_Beli_Awal(%)'] = 30
+        
+        # 2) & 5) Rekomendasi Harga Jual Take Profit Minimal Untung 3% dari modal beli
+        df_final['Harga_Jual_TP_Min3%'] = (df_final['Rekomendasi_Harga_Beli'] * 1.03).round()
+        
+        # 3) Rekomendasi Harga Jual Batasi Kerugian Cut Loss Maksimal Rugi 2% dari modal beli
+        df_final['Harga_Jual_CL_Maks2%'] = (df_final['Rekomendasi_Harga_Beli'] * 0.98).round()
+        
         return df_raw, df_final
     except FileNotFoundError:
         return None, None
@@ -75,15 +91,11 @@ def beri_warna_fluktuasi(val):
     elif val < 0: return 'color: #ff3333; font-weight: bold;'
     else: return 'color: #888888;'
 
-# MEMBUAT STRUKTUR TAB MENU UTAMA
 tab_dashboard, tab_sop = st.tabs(["📊 Dashboard Portofolio AI", "📋 Panduan SOP Investasi Baku"])
-
 with tab_dashboard:
     if df_final is not None:
         pilihan_indeks = st.radio(
-            "Tampilkan data berdasarkan indeks:",
-            options=["Saham Unggulan LQ45", "Saham Likuid Kompas100"],
-            horizontal=True
+            "Tampilkan data berdasarkan indeks:", options=["Saham Unggulan LQ45", "Saham Likuid Kompas100"], horizontal=True
         )
         
         if pilihan_indeks == "Saham Unggulan LQ45":
@@ -105,8 +117,7 @@ with tab_dashboard:
             list_ticker_jk = [f"{t}.JK" for t in df_filter_indeks_raw['Ticker'].tolist()]
             
             try:
-                # Perbaikan download massal 2d untuk lolos proteksi cloud streamlit
-                data_download = yf.download(list_ticker_jk, period="2d", group_by='ticker')
+                data_pasar = yf.download(list_ticker_jk, period="2d", group_by='ticker')
                 list_harga_live = []
                 list_perubahan = []
                 
@@ -141,8 +152,11 @@ with tab_dashboard:
             except Exception as e:
                 st.warning("Menampilkan data dasar model karena bursa sedang libur/tutup atau jaringan sibuk.")
                 st.dataframe(df_filter_indeks_raw[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Sekarang']].sort_values(by='Ticker'), width='stretch', hide_index=True)
+                
         st.markdown("---")
-        st.subheader("📋 Daftar Portofolio Rekomendasi AI")
+        
+        # === TABEL UTAMA: MENAMPILKAN METRIK HARGA BELI/JUAL/TP/CL BARU SECARA REALTIME ===
+        st.subheader("📋 Daftar Portofolio & Batasan Kontrol Risiko Jual-Beli AI")
         cari_saham = st.text_input("🔍 Cari Kode Saham (Contoh: BBCA, TLKM, ASII):").upper().strip()
         
         df_tampilan = df_filter_indeks_final.copy()
@@ -153,12 +167,13 @@ with tab_dashboard:
             df_tampilan,
             column_config={
                 "Ticker": st.column_config.TextColumn("Kode Saham"),
-                "Nama": st.column_config.TextColumn("Nama Perusahaan"),
-                "Sektor_Industri": st.column_config.TextColumn("Sektor Industri"),
-                "Harga_Sekarang": st.column_config.NumberColumn("Harga Pasar Model", format="Rp %d"),
-                "Harga_Wajar_Graham": st.column_config.NumberColumn("Harga Wajar Graham", format="Rp %d"),
-                "Margin_of_Safety(%)": st.column_config.NumberColumn("Margin of Safety", format="%.1f%%"),
-                "Rekomendasi_Akhir": st.column_config.TextColumn("Rekomendasi Keputusan AI")
+                "Nama": st.column_config.TextColumn("Nama Emiten"),
+                "Sektor_Industri": st.column_config.TextColumn("Sektor"),
+                "Rekomendasi_Harga_Beli": st.column_config.NumberColumn("Harga Beli Masuk (Rp)", format="Rp %d"),
+                "Maks_Beli_Awal(%)": st.column_config.NumberColumn("Maks Porsi Modal", format="%d%%"),
+                "Harga_Jual_TP_Min3%": st.column_config.NumberColumn("Harga Jual TP (≥3%)", format="Rp %d"),
+                "Harga_Jual_CL_Maks2%": st.column_config.NumberColumn("Harga Jual CL (≤2%)", format="Rp %d"),
+                "Rekomendasi_Akhir": st.column_config.TextColumn("Status Keputusan AI")
             },
             width='stretch', hide_index=True
         )
@@ -166,16 +181,14 @@ with tab_dashboard:
         st.download_button(
             label="📥 Unduh Daftar Saham Rekomendasi AI (CSV)",
             data=df_tampilan.to_csv(index=False).encode('utf-8'),
-            file_name='rekomendasi_saham_ai.csv',
-            mime='text/csv',
+            file_name='rekomendasi_saham_ai.csv', mime='text/csv',
         )
         
         st.markdown("---")
         st.subheader("🕯️ Analisis Grafik Candlestick Pro & Garis MA (3 Bulan)")
         
         pilihan_saham_grafik = st.selectbox(
-            "Pilih Kode Saham untuk melihat Grafik Candlestick & MA Kontrol:",
-            options=sorted(df_filter_indeks_raw['Ticker'].unique())
+            "Pilih Kode Saham untuk melihat Grafik Candlestick & MA Kontrol:", options=sorted(df_filter_indeks_raw['Ticker'].unique())
         )
         
         if pilihan_saham_grafik:
@@ -191,22 +204,17 @@ with tab_dashboard:
                     
                     fig = go.Figure()
                     fig.add_trace(go.Candlestick(
-                        x=df_teknikal.index, open=df_teknikal['Open'], high=df_teknikal['High'],
-                        low=df_teknikal['Low'], close=df_teknikal['Close'], name="Candlestick"
+                        x=df_teknikal.index, open=df_teknikal['Open'], high=df_teknikal['High'], low=df_teknikal['Low'], close=df_teknikal['Close'], name="Candlestick"
                     ))
                     fig.add_trace(go.Scatter(
-                        x=df_teknikal.index, y=df_teknikal['MA5'], mode='lines',
-                        name='Garis MA5 (M5)', line=dict(color='#ff9900', width=1.5)
+                        x=df_teknikal.index, y=df_teknikal['MA5'], mode='lines', name='Garis MA5 (M5)', line=dict(color='#ff9900', width=1.5)
                     ))
                     fig.add_trace(go.Scatter(
-                        x=df_teknikal.index, y=df_teknikal['MA20'], mode='lines',
-                        name='Garis MA20 (M20)', line=dict(color='#00bcff', width=2)
+                        x=df_teknikal.index, y=df_teknikal['MA20'], mode='lines', name='Garis MA20 (M20)', line=dict(color='#00bcff', width=2)
                     ))
                     fig.update_layout(
-                        title=f"Tren Pergerakan Harga Candlestick {pilihan_saham_grafik}",
-                        xaxis_title="Tanggal Bursa", yaxis_title="Harga Saham (Rp)",
-                        xaxis_rangeslider_visible=False, template="plotly_dark", height=500,
-                        margin=dict(l=10, r=10, t=40, b=10)
+                        title=f"Tren Pergerakan Harga Candlestick {pilihan_saham_grafik}", xaxis_title="Tanggal Bursa", yaxis_title="Harga Saham (Rp)",
+                        xaxis_rangeslider_visible=False, template="plotly_dark", height=500, margin=dict(l=10, r=10, t=40, b=10)
                     )
                     st.plotly_chart(fig, width='stretch')
                 else:
@@ -216,32 +224,15 @@ with tab_dashboard:
     else:
         st.error("Waduh! File basis data tidak ditemukan di folder Anda.")
 
-# === MENU TAB KEDUA: STRUKTUR SOP INVESTASI BAKU ===
+# === MENU TAB KEDUA: SOP INVESTASI ===
 with tab_sop:
     st.header("📋 SOP Eksekusi Investasi Saham BEI Terpadu")
-    st.write("Panduan resmi penggabungan analisis Kualitatif AI (Fundamental) dan Akurasi Momentum (Teknikal).")
-    
     st.markdown("""
-    ### 1. Tahap Skrining Awal (Fundamental AI)
-    * Cari emiten berlabel **STRONG BUY (Diskon >20%)** pada Dashboard utama.
-    * Catat **Harga Wajar Graham** dan nilai **Margin of Safety (MOS)**.
+    ### 1. Harga Beli & Porsi Modal
+    * Eksekusi beli saham rekomendasi utama AI pada kolom **Harga Beli Masuk (Rp)**.
+    * Batasi modal awal maksimal **30% dari total dana** per emiten untuk meminimalkan risiko fluktuasi jangka pendek.
     
-    ### 2. Tahap Analisis Tren Momentum (Teknikal MA5 & MA20)
-    * **Sinyal Masuk (Golden Cross):** Tunggu hingga garis **MA5 (Oranye)** berhasil memotong dan bergerak ke atas garis **MA20 (Biru)**.
-    * **Sinyal Candlestick:** Utamakan masuk saat grafik membentuk pola **Hammer** atau **Bullish Engulfing** tepat di atas batas support garis MA20.
-    
-    ### 3. Alokasi Pembelian & Manajemen Modal (Entry Strategy)
-    * Gunakan metode **DCA (Dollar Cost Averaging) Bertahap**:
-        * **Tahap 1 (Konfirmasi):** Masukkan **30% modal** saat konfirmasi pola grafik teknikal terbentuk.
-        * **Tahap 2 (Penguatan Tren):** Masukkan **70% sisa modal** jika posisi harga sukses bertahan di atas garis MA20 selama 5 hari bursa berturut-turut.
-    * **Alasan Membeli:** Emiten tergolong murah (*undervalued*) berdasarkan rumus intrinsik AI Graham Number, didukung pembalikan arah tren teknikal yang masif dari posisi jenuh jual (*oversold*).
-    
-    ### 4. Batasan Keluar & Pengamanan Modal (Exit Strategy)
-    * 📈 **Standar Ambil Untung (Take Profit - TP):**
-        * Jual aset 100% saat harga pasar menyentuh atau melampaui Target **Harga Wajar Graham** (Potensi profit rata-rata **+20% sbg +35%**).
-        * Eksekusi langsung jika grafik memicu sinyal *Dead Cross* (MA5 memotong ke bawah MA20).
-    * 📉 **Standar Batasi Kerugian (Cut Loss - CL):**
-        * Wajib disiplin keluar jika harga saham melemah hingga **-10%** dari modal pembelian awal.
-        * *Pengecualian:* Jika kinerja ROE tetap stabil >10% di laporan kuartal baru, Anda diperbolehkan melakukan *Average Down* di harga bawah.
+    ### 2. Batasan Keluar Pasar (Exit Rule)
+    * 📈 **Take Profit (TP):** Target jual untung dipatok jika harga naik menyentuh kolom **Harga Jual TP (≥3%)** dari harga modal beli Anda.
+    * 📉 **Cut Loss (CL):** Pengaman penyelamatan modal wajib dieksekusi tanpa emosi jika harga merosot jatuh menyentuh batas kolom **Harga Jual CL (≤2%)**.
     """)
-    st.success("💡 **SOP Note:** Disiplin pada sistem mengalahkan spekulasi pasar. Selalu jalankan pembaruan data fundamental per kuartal!")
