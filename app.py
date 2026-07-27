@@ -61,17 +61,17 @@ if df_final is not None:
                 
                 for col in data_pasar.columns:
                     if isinstance(col, tuple) and len(col) == 2:
-                        if col[0] == 'Close' and col[1] == ticker_full:
+                        if col == 'Close' and col == ticker_full:
                             series_valid = data_pasar[col].dropna()
                             if not series_valid.empty:
                                 harga_terakhir = int(round(series_valid.iloc[-1]))
                                 break
                 
                 if harga_terakhir is not None:
-                    harga_basis = int(df_raw[df_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
+                    harga_basis = int(df_raw[df_raw['Ticker'] == t]['Harga_Sekarang'].values)
                     selisih = harga_terakhir - harga_basis
                 else:
-                    harga_terakhir = int(df_raw[df_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
+                    harga_terakhir = int(df_raw[df_raw['Ticker'] == t]['Harga_Sekarang'].values)
                     selisih = 0
                     
                 list_harga_live.append(harga_terakhir)
@@ -125,11 +125,10 @@ if df_final is not None:
         use_container_width=True
     )
     
-    # === FITUR BARU: GRAFIK INTERAKTIF 3 BULAN TERAKHIR ===
+    # === FITUR PERBAIKAN: GRAFIK INTERAKTIF TANPA PARAMETER VERBOSE ===
     st.markdown("---")
     st.subheader("📈 Analisis Grafik Tren Harga Historis (3 Bulan)")
     
-    # Mengambil daftar emiten yang lolos filter AI sebagai pilihan default di dropdown
     pilihan_saham_grafik = st.selectbox(
         "Pilih Kode Saham untuk melihat Tren Grafik Fluktuasinya:",
         options=sorted(df_final['Ticker'].unique())
@@ -138,15 +137,21 @@ if df_final is not None:
     if pilihan_saham_grafik:
         st.write(f"Memuat grafik pergerakan harga untuk **{pilihan_saham_grafik}**...")
         try:
-            # Ambil data harian 3 bulan terakhir dari Yahoo Finance secara real-time
-            data_historis = yf.download(f"{pilihan_saham_grafik}.JK", period="3mo", interval="1d", verbose=False)
+            # PERBAIKAN: Parameter 'verbose' DIHAPUS agar tidak memicu error
+            data_historis = yf.download(f"{pilihan_saham_grafik}.JK", period="3mo", interval="1d")
             
             if not data_historis.empty:
-                # Bersihkan struktur kolom penutupan (Close)
-                df_grafik = pd.DataFrame(data_historis['Close'])
+                # Menangani ekstraksi kolom penutupan secara aman dari bentuk MultiIndex/Tuple
+                if isinstance(data_historis.columns, pd.MultiIndex) or any(isinstance(c, tuple) for c in data_historis.columns):
+                    # Cari kolom berlabel 'Close' di dalam data
+                    kolom_target = [c for c in data_pasar.columns if (isinstance(c, tuple) and c[0] == 'Close') or c == 'Close']
+                    df_grafik = pd.DataFrame(data_historis[kolom_target].dropna())
+                else:
+                    df_grafik = pd.DataFrame(data_historis['Close'].dropna())
+                
                 df_grafik.columns = ['Harga Penutupan (Rp)']
                 
-                # Tampilkan grafik garis interaktif yang indah
+                # Tampilkan grafik garis interaktif
                 st.line_chart(df_grafik, use_container_width=True)
             else:
                 st.warning("Data historis tidak ditemukan untuk emiten ini di Yahoo Finance.")
