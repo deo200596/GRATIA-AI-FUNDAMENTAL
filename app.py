@@ -45,7 +45,7 @@ if df_final is not None:
     col2.metric("Saham Lolos Filter Sehat", f"{saham_lolos} Emiten")
     col3.metric("Rekomendasi STRONG BUY AI", f"{strong_buy} Emiten")
     
-    # === FITUR KOMPAS100 DENGAN PERBAIKAN STRUKTUR TUPLE & PEWARNAAN ===
+    # === FITUR KOMPAS100 DENGAN PERBAIKAN `.map()` UNTUK PEWARNAAN VISUAL ===
     with st.expander("🔍 Klik di sini untuk melihat Daftar 100 Saham Kompas100 & Harga Real-Time"):
         st.write("Mengambil harga terkini langsung dari bursa pasar efek (Yahoo Finance)...")
         
@@ -53,7 +53,7 @@ if df_final is not None:
         list_ticker_jk = [f"{t}.JK" for t in df_raw['Ticker'].tolist()]
         
         try:
-            # Unduh data historis 1 hari terakhir
+            # Unduh data bursa 1 hari terakhir
             data_pasar = yf.download(list_ticker_jk, period="1d", interval="1m")
             
             list_harga_live = []
@@ -63,34 +63,35 @@ if df_final is not None:
                 ticker_full = f"{t}.JK"
                 harga_terakhir = None
                 
-                # SOLUSI: Periksa struktur Tuple ('Close', 'BBCA.JK') secara spesifik
+                # Periksa struktur Tuple ('Close', 'BBCA.JK') secara spesifik
                 for col in data_pasar.columns:
-                    if isinstance(col, tuple) and col[0] == 'Close' and col[1] == ticker_full:
-                        series_valid = data_pasar[col].dropna()
-                        if not series_valid.empty:
-                            harga_terakhir = int(round(series_valid.iloc[-1]))
-                            break
+                    if isinstance(col, tuple) and len(col) == 2:
+                        if col[0] == 'Close' and col[1] == ticker_full:
+                            series_valid = data_pasar[col].dropna()
+                            if not series_valid.empty:
+                                harga_terakhir = int(round(series_valid.iloc[-1]))
+                                break
                 
                 # Jika harga live berhasil diekstrak
                 if harga_terakhir is not None:
                     harga_basis = int(df_raw[df_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
                     selisih = harga_terakhir - harga_basis
                 else:
-                    # Jika bursa tutup, gunakan data model lama
+                    # Jika bursa tutup/jeda, gunakan data model lama
                     harga_terakhir = int(df_raw[df_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
                     selisih = 0
                     
                 list_harga_live.append(harga_terakhir)
                 list_perubahan.append(selisih)
             
-            # Memasukkan hasil ekstraksi skalar ke dalam tabel
+            # Memasukkan hasil ke dalam tabel
             df_kompas100 = df_raw[['Ticker', 'Nama']].copy()
             df_kompas100['Harga_Live_Pasar'] = list_harga_live
             df_kompas100['Fluktuasi_Harga'] = list_perubahan
             df_kompas100 = df_kompas100.sort_values(by='Ticker').reset_index(drop=True)
             
-            # OPTIMASI VISUAL: Mengaktifkan pewarnaan teks nyata menggunakan styling Pandas
-            df_berwarna = df_kompas100.style.applymap(beri_warna_fluktuasi, subset=['Fluktuasi_Harga'])
+            # PERBAIKAN UTAMA: Menggunakan `.map()` menggantikan `.applymap()` yang telah usang di Pandas terbaru
+            df_berwarna = df_kompas100.style.map(beri_warna_fluktuasi, subset=['Fluktuasi_Harga'])
             
             st.dataframe(
                 df_berwarna, 
