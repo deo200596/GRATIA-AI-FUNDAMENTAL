@@ -93,11 +93,12 @@ with tab_dashboard:
 
     data_bursa = unduh_harga_bursa_live(list_ticker_jk)
     
-    list_harga_live = []
-    list_perubahan = []
-    list_momentum = []
+    # Kamus data untuk mapping asinkronus bebas dari error panjang indeks bursa
+    kamus_harga_live = {}
+    kamus_perubahan = {}
+    kamus_momentum = {}
 
-    # Memproses penyelarasan skalar harga live menit ini
+    # Memproses penyelarasan skalar harga live menit ini ke dalam kamus map
     for t in df_filter_raw['Ticker']:
         ticker_full = f"{t}.JK"
         harga_terakhir = None
@@ -107,24 +108,22 @@ with tab_dashboard:
             if not series_close.empty:
                 harga_terakhir = int(round(series_close.iloc[-1]))
 
-        # PERBAIKAN FATAL ERROR BARIS 116: Menambahkan indeks [0] agar array pecah menjadi Python Skalar murni
         if harga_terakhir is not None and harga_terakhir > 0:
             harga_basis = int(df_filter_raw[df_filter_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
             selisih = harga_terakhir - harga_basis
             status_mo = "🟢 BULLISH (Naik)" if selisih > 0 else ("🔴 BEARISH (Turun)" if selisih < 0 else "⚪ SIDEWAYS")
         else:
-            # Sembuhkan juga baris cadangan agar tidak memicu error yang sama
             harga_terakhir = int(df_filter_raw[df_filter_raw['Ticker'] == t]['Harga_Sekarang'].values[0])
             selisih = 0
             status_mo = "⚪ DATA TERTUNDA"
 
-        list_harga_live.append(harga_terakhir)
-        list_perubahan.append(selisih)
-        list_momentum.append(status_mo)
+        kamus_harga_live[t] = harga_terakhir
+        kamus_perubahan[t] = selisih
+        kamus_momentum[t] = status_mo
 
-    # Memperbarui data live ke tabel real-time
-    df_filter_raw['Harga_Live_Pasar'] = list_harga_live
-    df_filter_raw['Fluktuasi_Harga'] = list_perubahan
+    # Memperbarui data live ke tabel real-time menggunakan mapping map aman
+    df_filter_raw['Harga_Live_Pasar'] = df_filter_raw['Ticker'].map(kamus_harga_live)
+    df_filter_raw['Fluktuasi_Harga'] = df_filter_raw['Ticker'].map(kamus_perubahan)
 
     with st.expander(f"🔍 Lihat Daftar Emiten & Harga Live - {pilihan_indeks}", expanded=True):
         def beri_warna_fluktuasi(val):
@@ -146,12 +145,12 @@ with tab_dashboard:
     st.markdown("---")
     st.subheader("📋 Kalkulator Kontrol Risiko & Rekomendasi Portofolio AI")
 
-    # MENGISI 5 MATRIKS KONTROL RISIKO SECARA PRESISI
-    df_filter_final['Harga_Beli_Masuk'] = list_harga_live
+    # === PERBAIKAN UTAMA: MENYUNTIKKAN DATA MENGGUNAKAN MAP TICKER AGAR LULUS ERROR LENGTH MATCH INDEKS ===
+    df_filter_final['Harga_Beli_Masuk'] = df_filter_final['Ticker'].map(kamus_harga_live)
     df_filter_final['Porsi_Modal_Maks'] = "30% Maks"
-    df_filter_final['Harga_Jual_TP_3%'] = (df_filter_final['Harga_Beli_Masuk'] * 1.03).astype(int)
-    df_filter_final['Harga_Jual_CL_2%'] = (df_filter_final['Harga_Beli_Masuk'] * 0.98).astype(int)
-    df_filter_final['Status_Momentum_Live'] = list_momentum
+    df_filter_final['Harga_Jual_TP_3%'] = (df_filter_final['Harga_Beli_Masuk'] * 1.03).fillna(0).astype(int)
+    df_filter_final['Harga_Jual_CL_2%'] = (df_filter_final['Harga_Beli_Masuk'] * 0.98).fillna(0).astype(int)
+    df_filter_final['Status_Momentum_Live'] = df_filter_final['Ticker'].map(kamus_momentum)
 
     cari_saham = st.text_input("🔍 Cari Kode Saham (Contoh: BBCA, TLKM, ASII):").upper().strip()
     if cari_saham:
