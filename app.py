@@ -13,7 +13,6 @@ st.markdown("---")
 # 2. FUNGSI UNTUK MEMBACA DATA
 def muat_data():
     try:
-        # Membaca 3 file data yang sudah sukses dibuat oleh script sebelumnya
         df_raw = pd.read_csv('data_kompas100.csv')
         df_screener = pd.read_csv('rekomendasi_saham_ai.csv')
         df_final = pd.read_csv('keputusan_final_ai_saham.csv')
@@ -21,7 +20,6 @@ def muat_data():
     except FileNotFoundError:
         return None, None, None
 
-# Panggil fungsi membaca data
 df_raw, df_screener, df_final = muat_data()
 
 # 3. MEMASTIKAN DATA TERSEDIA SEBELUM DITAMPILKAN
@@ -37,20 +35,25 @@ if df_final is not None:
     col2.metric("Saham Lolos Filter Sehat", f"{saham_lolos} Emiten")
     col3.metric("Rekomendasi STRONG BUY AI", f"{strong_buy} Emiten")
     
+    # === FITUR BARU: TOMBOL KLIK UNTUK MELIHAT DAFTAR KOMPAS100 ===
+    with st.expander("🔍 Klik di sini untuk melihat Daftar 100 Saham Kompas100 yang Dipantau"):
+        st.write("Berikut adalah kode emiten dan nama perusahaan yang dianalisis oleh AI:")
+        # Tampilkan hanya kolom Ticker dan Nama dari data mentah asli, urut berdasarkan Ticker
+        df_kompas100 = df_raw[['Ticker', 'Nama']].sort_values(by='Ticker').reset_index(drop=True)
+        st.dataframe(df_kompas100, use_container_width=True, hide_index=True)
+    
     st.markdown("---")
     
     # 4. FITUR PENCARIAN & TABEL INTERAKTIF
     st.subheader("📋 Daftar Portofolio Rekomendasi AI")
     st.write("Daftar di bawah ini otomatis diurutkan berdasarkan potensi diskon (*Margin of Safety*) tertinggi:")
     
-    # Membuat kolom input pencarian saham langsung di website
     cari_saham = st.text_input("🔍 Cari Kode Saham (Contoh: BBCA, TLKM, ASII):").upper().strip()
     
     df_tampilan = df_final.copy()
     if cari_saham:
         df_tampilan = df_tampilan[df_tampilan['Ticker'].str.contains(cari_saham)]
         
-    # Menampilkan Tabel Data Utama yang Interaktif
     st.dataframe(
         df_tampilan,
         column_config={
@@ -66,6 +69,4 @@ if df_final is not None:
     )
     
 else:
-    # Tampilan jika file CSV belum terbentuk atau terhapus
     st.error("Waduh! File basis data tidak ditemukan di folder Anda.")
-    st.info("💡 Solusi: Silakan jalankan file 'ai_model.py' terlebih dahulu di terminal Anda agar file 'keputusan_final_ai_saham.csv' tercipta otomatis.")
