@@ -8,7 +8,7 @@ import time
 # 1. PENGATURAN HALAMAN WEBSITE UTAMA
 st.set_page_config(page_title="Sistem Trading Harian BEI", layout="wide")
 
-# FITUR REFRESH OTOMATIS 10 DETIK
+# KONTROL SINKRONISASI BURSA (AUTO-REFRESH 10 DETIK)
 st.sidebar.subheader("⏱️ Kontrol Sinkronisasi Bursa")
 auto_refresh = st.sidebar.checkbox("Aktifkan Auto-Refresh (10 Detik)", value=True)
 
@@ -51,7 +51,7 @@ sektor_saham = {
     'PTRO': 'Perindustrian / Jasa Kontraktor', 'PWON': 'Properti & Real Estate', 'RAJA': 'Energi / Minyak & Gas', 
     'RATU': 'Energi / Infrastruktur', 'SCMA': 'Barang Konsumen Non-Primer / Media', 'SGER': 'Energi / Batu Bara', 
     'SIDO': 'Barang Konsumen Primer / Farmasi', 'SMGR': 'Barang Baku / Semen', 'SMIL': 'Infrastruktur / Logistik', 
-    'SMRA': 'Properti & Real Estate', 'SSIA': 'Properti & Konstruksi', 'TAPG': 'Barang Konsumen Primer / Sawit', 
+    'SMRA': 'Properti & Real Estate', 'SSIA': 'Properti & Konstruksi', 'TAPG': 'Barang Consumers Primer / Sawit', 
     'TCPI': 'Infrastruktur / Pelayaran', 'TINS': 'Barang Baku / Metal', 'TLKM': 'Infrastruktur / Telekomunikasi', 
     'TOBA': 'Energi & Infrastruktur', 'TOWR': 'Infrastruktur / Menara Telko', 'TPIA': 'Barang Baku / Kimia', 
     'UNTR': 'Perindustrian / Alat Berat', 'UNVR': 'Barang Konsumen Primer', 'WIFI': 'Infrastruktur / Teknologi', 
@@ -66,8 +66,11 @@ saham_lq45 = [
     'TOWR', 'TPIA', 'UNTR', 'UNVR', 'XL'
 ]
 
-# STRUKTUR TAB MENU UTAMA WEB
-tab_dashboard, tab_sop = st.tabs(["⚡ Dashboard Scalping & Trading Harian", "📋 Panduan SOP Scalping"])
+tab_dashboard, tab_sop, tab_spike = st.tabs([
+    "⚡ Dashboard Scalping & Trading Harian", 
+    "📋 Panduan SOP Scalping",
+    "🕵️‍♂️ Taktik Volume Spike (Pelacak Bandar)"
+])
 with tab_dashboard:
     try:
         df_raw = pd.read_csv('data_kompas100.csv')
@@ -82,9 +85,6 @@ with tab_dashboard:
         df_filter = df_raw[df_raw['Ticker'].isin(saham_lq45)].copy()
     else:
         df_filter = df_raw.copy()
-
-    total_saham = len(df_filter)
-    st.metric(f"Total Saham Siap Di-scalping ({pilihan_indeks})", f"{total_saham} Emiten Aktif")
 
     # STREAMING DATA HARGA & VOLUME LIVE
     list_ticker_jk = [f"{t}.JK" for t in df_filter['Ticker'].tolist()]
@@ -125,11 +125,11 @@ with tab_dashboard:
                         volume_terakhir = int(series_vol.iloc[-1])
 
         if harga_terakhir is not None and harga_terakhir > 0:
-            harga_basis = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].values[0])
+            harga_basis = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].iloc[0])
             selisih = harga_terakhir - harga_basis
-            status_mo = "🟢 SCALPING BUY (Bullish)" if selisih > 0 else ("🔴 AVOID (Bearish)" if selisih < 0 else "⚪ WAIT (Sideways)")
+            status_mo = "🟢 SCALPING BUY" if selisih > 0 else ("🔴 AVOID (Bearish)" if selisih < 0 else "⚪ WAIT (Sideways)")
         else:
-            harga_terakhir = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].values[0])
+            harga_terakhir = int(df_filter[df_filter['Ticker'] == t]['Harga_Sekarang'].iloc[0])
             selisih = 0
             status_mo = "⚪ WAIT (Sideways)"
 
@@ -163,25 +163,64 @@ with tab_dashboard:
     st.markdown("---")
     st.subheader("📋 Kalkulator Kontrol Risiko & Rekomendasi Portofolio Trading Harian")
 
+    # INPUT MODAL MANDIRI UNTUK FITUR 4
+    input_modal = st.number_input("💰 Masukkan Total Modal Siap Pakai Anda (Rp):", min_value=0, value=10000000, step=1000000)
+
+    # === IMPLEMENTASI FITUR PERMINTAAN USER: PANEL TOMBOL KLIK SCANNER BANDAR ===
+    st.write("🎯 **Panel Filter Pintar (Klik tombol untuk menyaring data otomatis):**")
+    
+    col_btn1, col_col2, col_btn3, col_btn4 = st.columns(4)
+    
+    # State penahan klik filter tombol
+    if 'filter_mode' not in st.session_state:
+        st.session_state.filter_mode = "NORMAL"
+
+    if col_btn1.button("📊 1) Urutkan Vol Bandar Tertinggi"):
+        st.session_state.filter_mode = "URUT_VOL"
+    if col_col2.button("⚠️ 2) Tampilkan Volume Palsu (< 50K)"):
+        st.session_state.filter_mode = "VOL_PALSU"
+    if col_btn3.button("🔥 3) Tampilkan Volume Valid (Akumulasi)"):
+        st.session_state.filter_mode = "VOL_VALID"
+    if col_btn4.button("🔄 Reset Tampilan Tabel"):
+        st.session_state.filter_mode = "NORMAL"
+
     df_trading = df_filter.copy()
     df_trading['Harga_Beli_Masuk'] = df_trading['Ticker'].map(kamus_harga_live)
-    df_trading['Porsi_Modal_Maks'] = "30% Maks"
+    
+    # === FITUR 4: HITUNG OTOMATIS VALUE RUPIAH PORSI KEMAMPUAN BELI 30% MODAL ===
+    df_trading['Rupiah_Maks_Beli_30%'] = int(input_modal * 0.30)
+    # Menghitung lembar/lot maksimal yang bisa dibeli (1 Lot = 100 lembar)
+    df_trading['Maks_Lot_Beli'] = (df_trading['Rupiah_Maks_Beli_30%'] / (df_trading['Harga_Beli_Masuk'] * 100)).fillna(0).astype(int)
+    
     df_trading['Harga_Jual_TP_3%'] = (df_trading['Harga_Beli_Masuk'] * 1.03).fillna(0).astype(int)
     df_trading['Harga_Jual_CL_2%'] = (df_trading['Harga_Beli_Masuk'] * 0.98).fillna(0).astype(int)
     df_trading['Status_Momentum_Live'] = df_trading['Ticker'].map(kamus_momentum)
 
-    cari_saham = st.text_input("🔍 Cari Kode Saham Trading (Contoh: BBCA, GOTO, ANTM):").upper().strip()
+    # EKSEKUSI LOGIKA TOMBOL KLIK USER DI ATAS TABLE
+    if st.session_state.filter_mode == "URUT_VOL":
+        df_trading = df_trading.sort_values(by='Volume_Transaksi', ascending=False)
+        st.info("Menampilkan seluruh data diurutkan dari Volume Transaksi Tertinggi.")
+    elif st.session_state.filter_mode == "VOL_PALSU":
+        # Fitur 2: Harga Naik tetapi Volume < 50.000 lembar
+        df_trading = df_trading[(df_trading['Status_Momentum_Live'] == "🟢 SCALPING BUY") & (df_trading['Volume_Transaksi'] < 50000)]
+        st.warning(f"Terdeteksi {len(df_trading)} Emiten Volume Palsu. Harga naik namun sepi transaksi bandar!")
+    elif st.session_state.filter_mode == "VOL_VALID":
+        # Fitur 3: Harga Naik dibarengi volume raksasa akumulasi bandar (> 100.000 lembar)
+        df_trading = df_trading[(df_trading['Status_Momentum_Live'] == "🟢 SCALPING BUY") & (df_trading['Volume_Transaksi'] >= 100000)]
+        st.success(f"Ditemukan {len(df_trading)} Emiten Volume Valid. Bandar sedang melakukan akumulasi masif!")
+
+    cari_saham = st.text_input("🔍 Atau Cari Ticker Saham Manual (Contoh: BBCA, GOTO):").upper().strip()
     if cari_saham:
         df_trading = df_trading[df_trading['Ticker'].str.contains(cari_saham)]
 
     st.dataframe(
-        df_trading[['Ticker', 'Nama', 'Sektor_Industri', 'Harga_Beli_Masuk', 'Porsi_Modal_Maks', 'Harga_Jual_TP_3%', 'Harga_Jual_CL_2%', 'Volume_Transaksi', 'Status_Momentum_Live']],
+        df_trading[['Ticker', 'Nama', 'Harga_Beli_Masuk', 'Rupiah_Maks_Beli_30%', 'Maks_Lot_Beli', 'Harga_Jual_TP_3%', 'Harga_Jual_CL_2%', 'Volume_Transaksi', 'Status_Momentum_Live']],
         column_config={
             "Ticker": st.column_config.TextColumn("Kode"),
             "Nama": st.column_config.TextColumn("Nama Emiten"),
-            "Sektor_Industri": st.column_config.TextColumn("Sektor"),
-            "Harga_Beli_Masuk": st.column_config.NumberColumn("Harga Beli Sekarang (Rp)", format="Rp %d"),
-            "Porsi_Modal_Maks": st.column_config.TextColumn("Porsi Modal"),
+            "Harga_Beli_Masuk": st.column_config.NumberColumn("Harga Beli (Rp)", format="Rp %d"),
+            "Rupiah_Maks_Beli_30%": st.column_config.NumberColumn("Porsi Dana 30%", format="Rp %d"),
+            "Maks_Lot_Beli": st.column_config.NumberColumn("Maks Kelola (Lot)", format="%d Lot"),
             "Harga_Jual_TP_3%": st.column_config.NumberColumn("Target TP (3%)", format="Rp %d"),
             "Harga_Jual_CL_2%": st.column_config.NumberColumn("Cut Loss (2%)", format="Rp %d"),
             "Volume_Transaksi": st.column_config.NumberColumn("Vol Bandar", format="%d"),
@@ -198,13 +237,14 @@ with tab_dashboard:
 
     st.markdown("---")
     st.subheader("🕯️ Analisis Grafik Candlestick Pro & Garis MA (3 Bulan)")
-    
     pilihan_saham_grafik = st.selectbox("Pilih Kode Saham Untuk Grafik Teknis:", options=sorted(df_filter['Ticker'].unique()))
+    
     if pilihan_saham_grafik:
         try:
-            # PERBAIKAN FATAL BARIS 210: Variabel typo dibuang, pemanggilan dipaksa skalar murni
             data_hist = yf.download(f"{pilihan_saham_grafik}.JK", period="3mo", interval="1d", multi_level_index=False)
             if not data_hist.empty:
+                if isinstance(data_hist.columns, pd.MultiIndex):
+                    data_hist.columns = data_hist.columns.get_level_values(0)
                 df_tek = data_hist[['Open', 'High', 'Low', 'Close']].dropna().copy()
                 df_tek['MA5'] = df_tek['Close'].rolling(window=5).mean()
                 df_tek['MA20'] = df_tek['Close'].rolling(window=20).mean()
@@ -218,16 +258,24 @@ with tab_dashboard:
         except Exception as e:
             st.error(f"Gagal memproses grafik lilin: {e}")
 
-# === TAB MENU UTAMA KEDUA: SOP TRADING HARIAN / SCALPING ===
+# === TAB MENU UTAMA KEDUA: SOP TRADING ===
 with tab_sop:
-    st.header("⚡ SOP Eksekusi Trading Harian (Scalping) Otomatis")
+    st.header("📋 SOP Eksekusi Trading Harian (Scalping) Otomatis")
     st.markdown("""
     ### 🛡️ Aturan Utama Kerja Trader Harian Kilat:
-    1. **Deteksi Likuiditas Bandar:** Urutkan tabel berdasarkan kolom **Volume Transaksi / Vol Bandar** tertinggi. Saham dengan volume jutaan lembar mendandakan emiten sedang ramai diperdagangkan secara aktif [INDEX].
-    2. **Saringan Saham:** Hanya eksekusi emiten yang memiliki status **🟢 SCALPING BUY (Bullish)**.
-    3. **Pembatasan Modal:** Maksimal dana satu saham adalah **30% dari total modal siap pakai** [INDEX].
-    4. **Disiplin Ambil Keuntungan:** Pasang *Sell Order* secara otomatis pada harga yang tertera di kolom **Target TP (3%)** [INDEX].
-    5. **Disiplin Batasi Kerugian:** Wajib pasang *Stop Loss* otomatis di nominal kolom **Cut Loss (2%)** [INDEX].
+    1. **Saringan Saham:** Gunakan tombol filter di dashboard utama untuk menyaring pergerakan bandar secara instan [INDEX].
+    2. **Pembatasan Modal:** Patuhi batasan nilai rupiah pada kolom **Porsi Dana 30%** dan kolom **Maks Kelola (Lot)** [INDEX].
+    3. **Disiplin Keluar Pasar:** Pasang antrean jual otomatis mengikuti target nominal **TP 3%** dan batas penyelamatan **CL 2%** [INDEX].
+    """)
+
+# === TAB MENU UTAMA KETIGA: TAKTIK VOLUME SPIKE ===
+with tab_spike:
+    st.header("🕵️‍♂️ Taktik Volume Spike: Cara Mendeteksi Pergerakan Bandar Lewat Tabel")
+    st.markdown("""
+    ### 🚀 Panduan Penggunaan Panel Tombol Filter Pintar
+    1. **Tombol Urutkan Vol Bandar:** Mengurutkan bursa dari transaksi paling besar [INDEX].
+    2. **Tombol Volume Palsu:** Menampilkan saham jebakan ritel yang harganya naik tanpa didukung modal besar bandar. Wajib dihindari [INDEX].
+    3. **Tombol Volume Valid:** Menampilkan saham yang murni sedang diakumulasi oleh bandar bursa modal raksasa. Target utama eksekusi *scalping* Anda [INDEX].
     """)
 
 # SINKRONISASI PENGULANG 10 DETIK
