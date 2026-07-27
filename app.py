@@ -145,10 +145,11 @@ if df_final is not None:
         mime='text/csv',
     )
     
-    # === FITUR PREMIUM: GRAFIK CANDLESTICK INTERAKTIF + MA5 + MA20 ===
+    # === FITUR PREMIUM PERBAIKAN: GRAFIK MENDUKUNG FULL INDEKS LQ45 ATAU KOMPAS100 ===
     st.markdown("---")
     st.subheader("🕯️ Analisis Grafik Candlestick Pro & Garis MA (3 Bulan)")
     
+    # PERBAIKAN UTAMA: Menggunakan data df_filter_indeks_raw agar pilihan mengikuti filter indeks di atas
     pilihan_saham_grafik = st.selectbox(
         "Pilih Kode Saham untuk melihat Grafik Candlestick & MA Kontrol:",
         options=sorted(df_filter_indeks_raw['Ticker'].unique())
