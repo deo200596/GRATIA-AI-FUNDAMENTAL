@@ -79,7 +79,7 @@ def hitung_rsi_live(series, period=14):
     rs = avg_gain / avg_loss
     return (100 - (100 / (1 + rs))).iloc[-1]
 
-# CONFIG MENU TABS TERBARU
+# CONFIG MENU TABS
 tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
     "⚡ Dashboard Scalping", 
     "📋 Panduan SOP",
@@ -90,7 +90,7 @@ tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, t
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING
+# 1. TAB DASHBOARD SCALPING (DENGAN KOLOM HARGA KEMARIN & HARI INI)
 # ==========================================
 with tab_dashboard:
     try:
@@ -132,8 +132,11 @@ with tab_dashboard:
             
             if kolom_close in data_bursa.columns:
                 series_close = data_bursa[kolom_close].dropna()
-                if not series_close.empty:
-                    harga_kini = int(round(series_close.iloc[-1]))
+                if len(series_close) >= 2:
+                    # AMBIL DATA HARGA HARI INI DAN HARGA KEMARIN SECARA RIIL
+                    harga_hari_ini = int(round(series_close.iloc[-1]))
+                    harga_kemarin = int(round(series_close.iloc[-2]))
+                    
                     rsi_skrg = round(hitung_rsi_live(series_close, period=14), 1)
                     
                     ma5 = series_close.rolling(window=5).mean().iloc[-1]
@@ -143,7 +146,8 @@ with tab_dashboard:
                     tabel_dashboard_list.append({
                         "Ticker Emiten": t,
                         "Sektor Industri": sektor_saham.get(t, 'Industri Lainnya'),
-                        "Harga Terakhir": harga_kini,
+                        "Harga Kemarin": harga_kemarin,
+                        "Harga Hari Ini": harga_hari_ini,
                         "Tren MA (5/20)": sinyal_ma,
                         "RSI Live (14)": rsi_skrg
                     })
@@ -267,7 +271,7 @@ with tab_bandarmologi:
             st.dataframe(df_adv, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT (FIXED INTERFACE ERROR)
+# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
@@ -278,7 +282,6 @@ with tab_risk:
         total_modal_trading = st.number_input("Masukkan Total Modal Siap Pakai (Rp)", min_value=0.0, value=10000000.0, step=1000000.0)
         persen_risiko_maks = st.slider("Toleransi Risiko per Transaksi (%)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
     with kol_r2:
-        # PERBAIKAN: Mengubah min_value menjadi bilangan bulat (int) agar seragam dan bebas error
         harga_beli_saham = st.number_input("Harga Rencana Beli Saham (Entry Price Rp)", min_value=1, value=1000, step=10)
         harga_cut_loss = st.number_input("Harga Batas Batalkan Kerugian (Stop Loss Rp)", min_value=1, value=950, step=10)
         
