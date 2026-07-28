@@ -91,7 +91,7 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (FIXED INDEKS GLOBAL MASIH KOSONG)
+# 1. TAB DASHBOARD SCALPING
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
@@ -106,7 +106,6 @@ with tab_dashboard:
                 if not df_indeks.empty and len(df_indeks) >= 2:
                     if isinstance(df_indeks.columns, pd.MultiIndex):
                         df_indeks.columns = df_indeks.columns.droplevel(1)
-                    
                     df_clean = df_indeks.dropna(subset=['Close'])
                     c_now = float(df_clean['Close'].iloc[-1])
                     c_prev = float(df_clean['Close'].iloc[-2])
@@ -118,21 +117,16 @@ with tab_dashboard:
 
     df_global = unduh_sentimen_global_fixed()
     
-    # PERBAIKAN TOTAL FORMAT METRIK: Menjamin syntax pembacaan data array pandas tepat sasaran
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
-        
-        # Cetak aman indeks bursa ke-1 (IHSG)
         if len(df_global) >= 1:
             with kol_g1: st.metric(label=df_global['Indeks'].iloc[0], value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
-        # Cetak aman indeks bursa ke-2 (S&P 500)
         if len(df_global) >= 2:
             with kol_n1: st.metric(label=df_global['Indeks'].iloc[1], value=f"{df_global['Harga Kini'].iloc[1]:,.2f}", delta=f"{df_global['Perubahan'].iloc[1]:+.2f}%")
-        # Cetak aman indeks bursa ke-3 (Nikkei 225)
         if len(df_global) >= 3:
             with kol_n2: st.metric(label=df_global['Indeks'].iloc[2], value=f"{df_global['Harga Kini'].iloc[2]:,.2f}", delta=f"{df_global['Perubahan'].iloc[2]:+.2f}%")
     else:
-        st.info("ℹ️ Sinyal bursa global macro sedang memuat, pastikan server terhubung ke bursa.")
+        st.info("ℹ️ Sinyal bursa global macro sedang memuat...")
 
     st.markdown("---")
     try:
@@ -189,43 +183,80 @@ with tab_dashboard:
         if not df_dash_view.empty:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 # ==========================================
-# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MONITOR REAL-TIME (TERUPDATE SANGAT DETAIL)
 # ==========================================
 with tab_chart:
-    st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI")
-    ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI").strip().upper()
+    st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI Real-Time")
+    st.write("Cari emiten Anda untuk melihat harga kemarin, harga saat ini, nominal perubahan naik-turun, serta fluktuasi per menit secara live.")
+    
+    ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI", key="input_chart_live").strip().upper()
     
     if ticker_pilihan:
-        with st.spinner("Memproses grafik interaktif Plotly..."):
+        with st.spinner("Mengunduh data bursa real-time terakurat..."):
             try:
-                df_single = yf.download(f"{ticker_pilihan}.JK", period="6mo", interval="1d", actions=False)
-                if not df_single.empty:
-                    if isinstance(df_single.columns, pd.MultiIndex):
-                        df_single.columns = df_single.columns.droplevel(1)
+                # 1. MENARIK DATA FLUKTUASI LIVE PER MENIT (1m) UNTUK KEPERLUAN TRACKING FLUKTUATIF
+                df_realtime = yf.download(f"{ticker_pilihan}.JK", period="5d", interval="1m", actions=False)
+                # 2. MENARIK DATA HISTORIS HARIAN UNTUK MENDAPATKAN HARGA PENUTUPAN KEMARIN SECARA VALID
+                df_daily_ref = yf.download(f"{ticker_pilihan}.JK", period="5d", interval="1d", actions=False)
+                
+                if not df_realtime.empty and not df_daily_ref.empty:
+                    # Meratakan multi-index kolom yfinance
+                    if isinstance(df_realtime.columns, pd.MultiIndex):
+                        df_realtime.columns = df_realtime.columns.droplevel(1)
+                    if isinstance(df_daily_ref.columns, pd.MultiIndex):
+                        df_daily_ref.columns = df_daily_ref.columns.droplevel(1)
                     
-                    df_single['MA5'] = df_single['Close'].rolling(window=5).mean()
-                    df_single['MA20'] = df_single['Close'].rolling(window=20).mean()
+                    # AMBIL DATA PARAMETER HARGA UNTUK METRIK
+                    harga_real_time = int(round(df_realtime['Close'].iloc[-1]))
+                    harga_sebelumnya = int(round(df_daily_ref['Close'].iloc[-2])) # Penutupan hari bursa kemarin
                     
-                    buy_x = [df_single.index[-5]]  
-                    buy_y = [df_single['Low'].iloc[-5]]
-                    sell_x = [df_single.index[-1]] 
-                    sell_y = [df_single['High'].iloc[-1]]
+                    # HITUNG KENAIKAN / PENURUNAN HARGA SECARA RIIL
+                    nominal_perubahan = harga_real_time - harga_sebelumnya
+                    persen_perubahan = (nominal_perubahan / harga_sebelumnya) * 100
                     
+                    # TAMPILKAN METRIK LIVE ATAS
+                    st.markdown("### 🔔 Ringkasan Pergerakan Harga Live")
+                    col_m1, col_m2, col_m3 = st.columns(3)
+                    with col_m1:
+                        st.metric("Harga Kemarin (Previous Close)", f"Rp {harga_sebelumnya:,.0f}")
+                    with col_m2:
+                        st.metric("Harga Real-Time Saat Ini", f"Rp {harga_real_time:,.0f}")
+                    with col_m3:
+                        st.metric("Perubahan Hari Ini (Fluctuating)", f"Rp {nominal_perubahan:+,0f}", f"{persen_perubahan:+.2f}%")
+                    
+                    st.markdown("---")
+                    # PROSES HITUNG GARIS MA UNTUK GRAFIK MENIT 
+                    df_realtime['MA5'] = df_realtime['Close'].rolling(window=5).mean()
+                    df_realtime['MA20'] = df_realtime['Close'].rolling(window=20).mean()
+                    
+                    buy_x = [df_realtime.index[-5]]  
+                    buy_y = [df_realtime['Low'].iloc[-5]]
+                    sell_x = [df_realtime.index[-1]] 
+                    sell_y = [df_realtime['High'].iloc[-1]]
+                    
+                    # GAMBAR GRAFIK FLUKTUATIF
                     fig = go.Figure()
                     fig.add_trace(go.Candlestick(
-                        x=df_single.index, open=df_single['Open'], high=df_single['High'],
-                        low=df_single['Low'], close=df_single['Close'], name="Candlestick"
+                        x=df_realtime.index, open=df_realtime['Open'], high=df_realtime['High'],
+                        low=df_realtime['Low'], close=df_realtime['Close'], name="Candlestick Menit"
                     ))
-                    fig.add_trace(go.Scatter(x=df_single.index, y=df_single['MA5'], line=dict(color='orange', width=1.5), name='MA5'))
-                    fig.add_trace(go.Scatter(x=df_single.index, y=df_single['MA20'], line=dict(color='blue', width=1.5), name='MA20'))
+                    fig.add_trace(go.Scatter(x=df_realtime.index, y=df_realtime['MA5'], line=dict(color='orange', width=1.2), name='MA5 (Fast)'))
+                    fig.add_trace(go.Scatter(x=df_realtime.index, y=df_realtime['MA20'], line=dict(color='blue', width=1.2), name='MA20 (Slow)'))
                     
-                    fig.add_trace(go.Scatter(x=buy_x, y=buy_y, mode='markers', marker=dict(symbol='triangle-up', size=15, color='green'), name='Titik Beli Ideal'))
-                    fig.add_trace(go.Scatter(x=sell_x, y=sell_y, mode='markers', marker=dict(symbol='triangle-down', size=15, color='red'), name='Titik Jual Ideal'))
+                    fig.add_trace(go.Scatter(x=buy_x, y=buy_y, mode='markers', marker=dict(symbol='triangle-up', size=14, color='green', line=dict(width=1, color='black')), name='Titik Beli Ideal'))
+                    fig.add_trace(go.Scatter(x=sell_x, y=sell_y, mode='markers', marker=dict(symbol='triangle-down', size=14, color='red', line=dict(width=1, color='black')), name='Titik Jual Ideal'))
                     
-                    fig.update_layout(xaxis_rangeslider_visible=False, height=450, xaxis=dict(type='date', tickformat='%Y-%m-%d', title="Tanggal Transaksi Bursa"))
+                    fig.update_layout(
+                        title=f"Grafik Fluktuatif Menit Saham {ticker_pilihan}.JK",
+                        xaxis_rangeslider_visible=False, 
+                        height=480, 
+                        xaxis=dict(type='date', tickformat='%H:%M', title="Waktu Perdagangan Live")
+                    )
                     st.plotly_chart(fig, use_container_width=True)
-            except:
-                st.error("Gagal memuat chart untuk emiten tersebut.")
+                else:
+                    st.error(f"Gagal memuat data live emiten {ticker_pilihan}. Periksa ketersediaan kode bursa.")
+            except Exception as e:
+                st.error(f"Koneksi server terputus saat memuat data menit bursa: {str(e)}")
 
 # ==========================================
 # 3. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
