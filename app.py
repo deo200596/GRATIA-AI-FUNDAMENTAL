@@ -342,7 +342,7 @@ with tab_bandarmologi:
             st.dataframe(df_adv, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT (SEKARANG DENGAN % PROFIT & LOSS RIIL)
+# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT (DENGAN TOTAL NOMINAL JIKA PROFIT / LOSS)
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
@@ -363,20 +363,22 @@ with tab_risk:
         elif harga_beli_saham >= harga_target_profit:
             st.error("Error: Harga Target Profit harus lebih tinggi daripada Harga Rencana Beli!")
         else:
-            # Perhitungan Lot & Risiko Capital
             rupiah_risiko_maks = total_modal_trading * (persen_risiko_maks / 100)
             jarak_loss_per_lembar = harga_beli_saham - harga_cut_loss
             
-            maks_lembar_saham = rupiah_risiko_maks / jarak_loss_per_lembar
-            maks_lot_pembelian = maks_lembar_saham / 100
-            total_uang_belanja = maks_lembar_saham * harga_beli_saham
+            maks_lot_pembelian = int((rupiah_risiko_maks / jarak_loss_per_lembar) / 100)
+            lembar_riil_dibeli = maks_lot_pembelian * 100
+            total_uang_belanja = lembar_riil_dibeli * harga_beli_saham
             
-            # FITUR BARU: Menghitung persentase perkiraan Profit dan Loss teknikal saham
             persen_perkiraan_loss = (jarak_loss_per_lembar / harga_beli_saham) * 100
             jarak_profit_per_lembar = harga_target_profit - harga_beli_saham
             persen_perkiraan_profit = (jarak_profit_per_lembar / harga_beli_saham) * 100
             
-            # Hitung Risk-to-Reward Ratio
+            nominal_total_jika_profit = lembar_riil_dibeli * harga_target_profit
+            nominal_total_jika_loss = lembar_riil_dibeli * harga_cut_loss
+            
+            rupiah_keuntungan_bersih = nominal_total_jika_profit - total_uang_belanja
+            rupiah_kerugian_bersih = total_uang_belanja - nominal_total_jika_loss
             risk_reward_ratio = jarak_profit_per_lembar / jarak_loss_per_lembar
             
             st.markdown("---")
@@ -384,21 +386,28 @@ with tab_risk:
             
             kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
             with kol_h1:
-                st.metric("Maksimal Pembelian", f"{int(maks_lot_pembelian)} Lot")
+                st.metric("Maksimal Pembelian", f"{maks_lot_pembelian} Lot")
             with kol_h2:
-                st.metric("Uang Belanja Dipunakan", f"Rp {total_uang_belanja:,.0f}")
+                st.metric("Modal Terpakai", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3:
-                st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%", delta_color="inverse")
+                st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%")
             with kol_h4:
                 st.metric("Perkiraan Profit (%)", f"+{persen_perkiraan_profit:.2f}%")
                 
             st.markdown("---")
+            st.subheader("💰 Ringkasan Estimasi Saldo Uang Kembali")
+            kol_n1, kol_n2 = st.columns(2)
+            with kol_n1:
+                st.error(f"📉 **Jika Terkena Cut Loss:**\n* Total Dana Kembali: Rp {nominal_total_jika_loss:,.0f}\n* Net Rugi Bersih: -Rp {rupiah_kerugian_bersih:,.0f}")
+            with kol_n2:
+                st.success(f"📈 **Jika Mencapai Target Profit:**\n* Total Dana Kembali: Rp {nominal_total_jika_profit:,.0f}\n* Net Untung Bersih: +Rp {rupiah_keuntungan_bersih:,.0f}")
+                
+            st.markdown("---")
             st.write(f"▶️ **Rasio Risk-to-Reward:** 1 : {risk_reward_ratio:.2f}")
             if risk_reward_ratio >= 2.0:
-                st.success(f"⚖️ **Rekomendasi AI:** Transaksi ini **SANGAT LAYAK EXECUTED** karena potensi persentase profit (+{persen_perkiraan_profit:.2f}%) lebih dari 2 kali lipat dibanding risiko kerugian (-{persen_perkiraan_loss:.2f}%).")
+                st.success(f"⚖️ **Rekomendasi AI:** Transaksi ini **SANGAT LAYAK EXECUTED**.")
             else:
-                st.warning(f"⚖️ **Rekomendasi AI:** Transaksi ini **KURANG IDEAL**. Naikkan target profit Anda atau dekatkan harga cut-loss agar rasio keuntungan berbanding risiko lebih menguntungkan.")
-
+                st.warning(f"⚖️ **Rekomendasi AI:** Transaksi ini **KURANG IDEAL**.")
 # ==========================================
 # 7. TAB KALKULATOR INVESTASI BULANAN & LOG
 # ==========================================
