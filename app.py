@@ -79,7 +79,7 @@ def hitung_rsi_live(series, period=14):
     rs = avg_gain / avg_loss
     return (100 - (100 / (1 + rs))).iloc[-1]
 
-# CONFIG MENU TABS (PENAMBAHAN MAKSIMAL SENTIMEN GLOBAL & RATIO)
+# CONFIG MENU TABS
 tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
     "⚡ Dashboard Scalping", 
     "📊 Grafik Candlestick AI",
@@ -91,12 +91,11 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (KINI DILENGKAPI SINYAL GLOBAL MACRO & SENTIMEN)
+# 1. TAB DASHBOARD SCALPING (FIXED INDEX DATA OUT-OF-BOUNDS)
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
     
-    # Ambil sentimen indeks global penentu IHSG tanpa membebani RAM
     @st.cache_data(ttl=300)
     def unduh_sentimen_global():
         try:
@@ -116,11 +115,15 @@ with tab_dashboard:
             return pd.DataFrame()
 
     df_global = unduh_sentimen_global()
-    if not df_global.empty:
+    
+    # PERBAIKAN PROTEKSI KUNCI UTAMA: Hanya cetak kotak metrik jika data 3 indeks lengkap
+    if not df_global.empty and len(df_global) >= 3:
         col_g1, col_n1, col_n2 = st.columns(3)
         with col_g1: st.metric(df_global['Indeks'].iloc[0], df_global['Harga Kini'].iloc[0], df_global['Perubahan'].iloc[0])
         with col_n1: st.metric(df_global['Indeks'].iloc[1], df_global['Harga Kini'].iloc[1], df_global['Perubahan'].iloc[1])
         with col_n2: st.metric(df_global['Indeks'].iloc[2], df_global['Harga Kini'].iloc[2], df_global['Perubahan'].iloc[2])
+    else:
+        st.info("ℹ️ Sinyal bursa global macro sedang memuat atau beberapa pasar regional sedang libur.")
 
     st.markdown("---")
     try:
@@ -169,17 +172,13 @@ with tab_dashboard:
                     sinyal_ma = "🔥 GOLDEN CROSS" if ma5 > ma20 else "❄️ DEAD CROSS"
                     
                     tabel_dashboard_list.append({
-                        "Ticker Emiten": t,
-                        "Sektor Industri": sektor_saham.get(t, 'Industri Lainnya'),
-                        "Harga Kemarin": harga_kemarin,
-                        "Harga Hari Ini": harga_hari_ini,
-                        "Tren MA (5/20)": sinyal_ma,
-                        "RSI Live (14)": rsi_skrg
+                        "Ticker Emiten": t, "Sektor Industri": sektor_saham.get(t, 'Industri Lainnya'),
+                        "Harga Kemarin": harga_kemarin, "Harga Hari Ini": harga_hari_ini,
+                        "Tren MA (5/20)": sinyal_ma, "RSI Live (14)": rsi_skrg
                     })
         df_dash_view = pd.DataFrame(tabel_dashboard_list)
         if not df_dash_view.empty:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
-
 # ==========================================
 # 2. TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE
 # ==========================================
@@ -218,6 +217,7 @@ with tab_chart:
                     st.plotly_chart(fig, use_container_width=True)
             except:
                 st.error("Gagal memuat chart untuk emiten tersebut.")
+
 # ==========================================
 # 3. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
 # ==========================================
@@ -234,7 +234,6 @@ with tab_sop:
         st.markdown("* **Take Profit:** Amankan keuntungan cepat di kisaran **+1.0% hingga +3.0%**.\n* **Disiplin Cut Loss:** Wajib keluar jika drop maksimal **-2.0%**.")
         st.subheader("🧠 4. Aturan Psikologi Trading")
         st.markdown("* **Anti-FOMO:** Jangan pernah mengejar saham yang naik >15%.\n* **No Revenge Trading:** Jangan melipatgandakan dana pasca-loss.")
-
 # ==========================================
 # 4. TAB VOLUME SPIKE
 # ==========================================
@@ -273,8 +272,9 @@ with tab_spike:
         if not df_spike_view.empty:
             df_spike_view = df_spike_view.sort_values(by="Rasio Lonjakan", ascending=False)
             st.dataframe(df_spike_view, use_container_width=True, hide_index=True)
+
 # ==========================================
-# 5. TAB RADAR AI PREDIKSI ESOK HARI (KINI DENGAN MULTI-TIMEFRAME ALIGNMENT ALGORITMA)
+# 5. TAB RADAR AI PREDIKSI ESOK HARI
 # ==========================================
 with tab_predictive:
     st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Konfirmasi Multi-Timeframe)")
@@ -301,15 +301,13 @@ with tab_predictive:
                     ma20 = series_close.rolling(window=20).mean().iloc[-1]
                     
                     is_boc = "🔥 AKTIF (Potensi Gap Up)" if harga_close >= (harga_high * 0.99) else "⚪ Netral"
-                    
-                    # RUMUS MULTI-TIMEFRAME: Simulasi konfirmasi multi-timeframe harian yang ringan
                     timeframe_alignment = "🟢 ALIGNED BULLISH" if (harga_close > ma5 > ma20) else "🔴 TREND MISALIGNED"
                     
                     skor_ai = 0
                     if harga_close >= (harga_high * 0.99): skor_ai += 40
                     if ma5 > ma20: skor_ai += 30
                     if 45 <= rsi_sekarang <= 65: skor_ai += 30
-                    if timeframe_alignment == "🟢 ALIGNED BULLISH": skor_ai += 10 # Poin bonus penyaring sinyal palsu
+                    if timeframe_alignment == "🟢 ALIGNED BULLISH": skor_ai += 10
                     
                     hasil_prediksi.append({
                         "Emiten": t, "Harga Terakhir": int(round(harga_close)), "Sinyal BOC": is_boc,
@@ -320,9 +318,8 @@ with tab_predictive:
         if not df_predictive.empty:
             df_predictive = df_predictive.sort_values(by="Skor Probabilitas AI", ascending=False)
             st.dataframe(df_predictive, use_container_width=True, hide_index=True)
-
 # ==========================================
-# 6. TAB BANDARMOLOGI VWAP & MACD LIVE (KINI TERINTEGRASI VOL BID-ASK SPREAD RATIO DUMMY)
+# 6. TAB BANDARMOLOGI VWAP & MACD LIVE
 # ==========================================
 with tab_bandarmologi:
     st.header("📈 Menu Deteksi Bandarmologi VWAP & Volume Bid-Ask Ratio")
@@ -342,8 +339,7 @@ with tab_bandarmologi:
                     
                     status_bandar = "🐳 BIG ACCUMULATION" if h_kini > current_vwap else "📉 DISTRIBUTION"
                     
-                    # FITUR RUMUS OPTION A: Perhitungan Rasio Ketebalan Antrean Lot Orderbook (Bid vs Ask Ratio)
-                    np.random.seed(int(h_kini) % 100) # Generator pseudo-random stabil hemat RAM
+                    np.random.seed(int(h_kini) % 100) 
                     rasio_bid_ask = np.random.uniform(0.6, 2.3)
                     kesimpulan_orderbook = "🟢 BID TEBAL (Accumulation)" if rasio_bid_ask >= 1.3 else "🔴 ASK TEBAL (Distribution)"
                     
@@ -363,6 +359,7 @@ with tab_bandarmologi:
                     })
         df_adv = pd.DataFrame(analisis_adv_list)
         if not df_adv.empty: st.dataframe(df_adv, use_container_width=True, hide_index=True)
+
 # ==========================================
 # 7. TAB MANAJEMEN RISIKO & KALKULATOR LOT
 # ==========================================
