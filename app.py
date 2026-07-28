@@ -23,6 +23,19 @@ st.write(f"Aplikasi acuan momentum trading cepat. Terakhir Diperbarui: {time.str
 
 st.markdown("---")
 
+# AUTOMASI STRUKTUR FRAKSI HARGA RESMI BURSA EFEK INDONESIA (BEI)
+def hitung_fraksi_bei(harga):
+    if harga < 200:
+        return 1
+    elif harga < 500:
+        return 2
+    elif harga < 2000:
+        return 5
+    elif harga < 5000:
+        return 10
+    else:
+        return 25
+
 # DATA KAMUS SEKTOR INDUSTRI RESMI BEI
 sektor_saham = {
     'AADI': 'Energi / Batu Bara', 'ACES': 'Barang Konsumen Non-Primer', 'ADMR': 'Energi / Batu Bara', 
@@ -91,7 +104,7 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (FIXED PARSING INDEX ERROR)
+# 1. TAB DASHBOARD SCALPING
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
@@ -119,8 +132,6 @@ with tab_dashboard:
     
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
-        
-        # PERBAIKAN INTEGRASI: Memasukkan nomor baris eksplisit, [1], [2] pada iloc agar terbaca sebagai angka riil
         if len(df_global) >= 1:
             with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
         if len(df_global) >= 2:
@@ -185,7 +196,7 @@ with tab_dashboard:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 2. TAB VISUALISASI GRAFIK CANDLESTICK STYLE TRADINGVIEW PRO (ZONA WAKTU WIB)
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK STYLE TRADINGVIEW DENGAN SKALA TIK BEI
 # ==========================================
 with tab_chart:
     st.header("📊 Grafik Candlestick Pro-Akurasi (TradingView Dark Style)")
@@ -226,11 +237,15 @@ with tab_chart:
                     nominal_perubahan = harga_real_time - harga_sebelumnya
                     persen_perubahan = (nominal_perubahan / harga_sebelumnya) * 100
                     
+                    # HITUNG UKURAN FRAKSI TIK SECARA MATEMATIS BURSA
+                    nilai_tik_fraksi = hitung_fraksi_bei(harga_real_time)
+                    
                     st.markdown("### 🔔 Ringkasan Pergerakan Harga Live")
                     col_m1, col_m2, col_m3 = st.columns(3)
                     with col_m1: st.metric("Harga Sebelumnya (Ref Close)", f"Rp {harga_sebelumnya:,.0f}")
                     with col_m2: st.metric(f"Harga Kini ({pilihan_tf})", f"Rp {harga_real_time:,.0f}")
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
+                    st.caption(f"⚙️ **Deteksi Struktur Tik:** Kelipatan bursa resmi untuk emiten ini adalah **Rp {nilai_tik_fraksi}** per Tik.")
                     
                     st.markdown("---")
                     df_chart_data['EMA9'] = df_chart_data['Close'].ewm(span=9, adjust=False).mean()
@@ -259,11 +274,13 @@ with tab_chart:
                         title=f"Tren Visual Premium {ticker_pilihan}.JK ({pilihan_tf})", xaxis_rangeslider_visible=False, height=500,
                         paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#d1d4dc'), hovermode='x unified',
                         xaxis=dict(type='date', tickformat=fmt_axis, showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', title="Waktu Perdagangan (WIB)"),
-                        yaxis=dict(showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', side='right', title="Skala Harga Rupiah")
+                        yaxis=dict(
+                            showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', side='right', title="Skala Harga Rupiah",
+                            # INTERVENSI GRIDS: Mengunci kelipatan jarak grid sumbu Y agar melompat tepat sebesar 10x lipat nilai 1 Tik BEI
+                            dtick=nilai_tik_fraksi * 10 
+                        )
                     )
                     st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.error(f"Gagal memuat data emiten {ticker_pilihan}.")
             except Exception as e:
                 st.error(f"Hambatan memproses data bursa: {str(e)}")
 # ==========================================
@@ -299,7 +316,7 @@ with tab_spike:
             
             if kol_vol in data_bursa.columns and kol_close in data_bursa.columns:
                 series_vol = data_bursa[kol_vol].dropna()
-                series_close = data_bursa[kol_close].dropna()
+                series_close = data_bursa[kolom_close].dropna()
                 
                 if len(series_vol) >= 6:
                     vol_hari_ini = series_vol.iloc[-1]
@@ -440,7 +457,7 @@ with tab_risk:
             
             st.markdown("---")
             st.subheader("📊 Hasil Perhitungan Proteksi Modal & Persentase Profitabilitas")
-            kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
+            kol_h1, col_h2, col_h3, col_h4 = st.columns(4)
             with kol_h1: st.metric("Maksimal Pembelian", f"{maks_lot_pembelian} Lot")
             with kol_h2: st.metric("Modal Terpakai", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3: st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%")
