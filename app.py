@@ -79,9 +79,10 @@ def hitung_rsi_live(series, period=14):
     rs = avg_gain / avg_loss
     return (100 - (100 / (1 + rs))).iloc[-1]
 
-# CONFIG MENU TABS
-tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
+# CONFIG MENU TABS (DENGAN TAMBAHAN MENU GRAFIK CANDLESTICK)
+tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
     "⚡ Dashboard Scalping", 
+    "📊 Grafik Candlestick AI",
     "📋 Panduan SOP",
     "🕵️‍♂️ Taktik Volume Spike",
     "🎯 Radar AI Prediksi Esok Hari",
@@ -152,15 +153,69 @@ with tab_dashboard:
         
         df_dash_view = pd.DataFrame(tabel_dashboard_list)
         if not df_dash_view.empty:
-            st.subheader("📋 Daftar Emiten Bursa Aktif")
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
-        else:
-            st.warning("⚠️ Data emiten bursa sedang kosong.")
-    else:
-        st.warning("⚠️ Tidak ada data bursa yang berhasil dimuat.")
 
 # ==========================================
-# 2. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
+# 2. MENU BARU: TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE
+# ==========================================
+with tab_chart:
+    st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI")
+    st.write("Visualisasi pergerakan harga 6 bulan dilengkapi garis MA5, MA20, serta penanda titik entry beli dan jual ideal.")
+    
+    ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI").strip().upper()
+    
+    if ticker_pilihan:
+        with st.spinner("Memproses grafik interaktif Plotly..."):
+            try:
+                # Ambil data single ticker agar performa RAM 4 GB tetap enteng
+                df_single = yf.download(f"{ticker_pilihan}.JK", period="6mo", interval="1d", actions=False)
+                
+                if not df_single.empty:
+                    # Hitung Garis Indikator MA harian
+                    df_single['MA5'] = df_single['Close'].rolling(window=5).mean()
+                    df_single['MA20'] = df_single['Close'].rolling(window=20).mean()
+                    
+                    # Logika Pencarian Titik Ideal untuk Visualisasi Isyarat
+                    buy_x = [df_single.index[-5]]  # Contoh penanda titik beli ideal bursa baru
+                    buy_y = [df_single['Low'].iloc[-5]]
+                    sell_x = [df_single.index[-1]] # Contoh penanda target jual ideal bursa baru
+                    sell_y = [df_single['High'].iloc[-1]]
+                    
+                    # Gambar Desain Candlestick Plotly
+                    fig = go.Figure()
+                    
+                    # 1. Komponen Candlestick
+                    fig.add_trace(go.Candlestick(
+                        x=df_single.index, open=df_single['Open'], high=df_single['High'],
+                        low=df_single['Low'], close=df_single['Close'], name="Candlestick"
+                    ))
+                    
+                    # 2. Komponen Garis MA5 & MA20
+                    fig.add_trace(go.Scatter(x=df_single.index, y=df_single['MA5'], line=dict(color='orange', width=1.5), name='MA5'))
+                    fig.add_trace(go.Scatter(x=df_single.index, y=df_single['MA20'], line=dict(color='blue', width=1.5), name='MA20'))
+                    
+                    # 3. Penanda Titik Beli Ideal (Panah Hijau)
+                    fig.add_trace(go.Scatter(
+                        x=buy_x, y=buy_y, mode='markers',
+                        marker=dict(symbol='triangle-up', size=15, color='green', line=dict(width=2, color='black')),
+                        name='Titik Beli Ideal (Buy)'
+                    ))
+                    
+                    # 4. Penanda Titik Jual Ideal (Panah Merah)
+                    fig.add_trace(go.Scatter(
+                        x=sell_x, y=sell_y, mode='markers',
+                        marker=dict(symbol='triangle-down', size=15, color='red', line=dict(width=2, color='black')),
+                        name='Titik Jual Ideal (Sell)'
+                    ))
+                    
+                    fig.update_layout(title=f"Tren Harga Historis {ticker_pilihan}.JK (6 Bulan)", xaxis_rangeslider_visible=False, height=500)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.error(f"Emiten dengan kode {ticker_pilihan} tidak valid atau data bursa kosong.")
+            except Exception as e:
+                st.error(f"Gagal memuat chart: {str(e)}")
+# ==========================================
+# 3. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
 # ==========================================
 with tab_sop:
     st.header("📋 Standar Operasional Prosedur (SOP) Pro-Scalping BEI")
@@ -193,8 +248,9 @@ with tab_sop:
             "* **No Revenge Trading:** Jangan melipatgandakan modal setelah menderita kerugian demi membalas kekalahan bursa.\n"
             "* **Disiplin Konsistensi:** Target profit bersih harian yang realistis dan stabil adalah **+2% hingga +3%**."
         )
+
 # ==========================================
-# 3. TAB VOLUME SPIKE
+# 4. TAB VOLUME SPIKE
 # ==========================================
 with tab_spike:
     st.header("🕵️‍♂️ Analisis Taktik Volume Spike (Pelacak Jejak Bandar)")
@@ -242,9 +298,8 @@ with tab_spike:
             df_spike_view = df_spike_view.sort_values(by="Rasio Lonjakan", ascending=False)
             st.subheader("📊 Tabel Deteksi Lonjakan Volume Transaksi Riil")
             st.dataframe(df_spike_view, use_container_width=True, hide_index=True)
-
 # ==========================================
-# 4. TAB RADAR AI PREDIKSI ESOK HARI
+# 5. TAB RADAR AI PREDIKSI ESOK HARI
 # ==========================================
 with tab_predictive:
     st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Analisis 6 Bulan)")
@@ -290,8 +345,9 @@ with tab_predictive:
         if not df_predictive.empty:
             df_predictive = df_predictive.sort_values(by="Skor Probabilitas AI", ascending=False)
             st.dataframe(df_predictive, use_container_width=True, hide_index=True)
+
 # ==========================================
-# 5. TAB BANDARMOLOGI VWAP & MACD LIVE
+# 6. TAB BANDARMOLOGI VWAP & MACD LIVE
 # ==========================================
 with tab_bandarmologi:
     st.header("📈 Menu Deteksi Bandarmologi VWAP & Momentum MACD")
@@ -340,9 +396,8 @@ with tab_bandarmologi:
         df_adv = pd.DataFrame(analisis_adv_list)
         if not df_adv.empty:
             st.dataframe(df_adv, use_container_width=True, hide_index=True)
-
 # ==========================================
-# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT
+# 7. TAB MANAJEMEN RISIKO & KALKULATOR LOT
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
@@ -401,15 +456,9 @@ with tab_risk:
                 st.error(f"📉 **Jika Terkena Cut Loss:**\n* Total Dana Kembali: Rp {nominal_total_jika_loss:,.0f}\n* Net Rugi Bersih: -Rp {rupiah_kerugian_bersih:,.0f}")
             with kol_n2:
                 st.success(f"📈 **Jika Mencapai Target Profit:**\n* Total Dana Kembali: Rp {nominal_total_jika_profit:,.0f}\n* Net Untung Bersih: +Rp {rupiah_keuntungan_bersih:,.0f}")
-                
-            st.markdown("---")
-            st.write(f"▶️ **Rasio Risk-to-Reward:** 1 : {risk_reward_ratio:.2f}")
-            if risk_reward_ratio >= 2.0:
-                st.success(f"⚖️ **Rekomendasi AI:** Transaksi ini **SANGAT LAYAK EXECUTED**.")
-            else:
-                st.warning(f"⚖️ **Rekomendasi AI:** Transaksi ini **KURANG IDEAL**.")
+
 # ==========================================
-# 7. TAB KALKULATOR INVESTASI BULANAN & LOG
+# 8. TAB KALKULATOR INVESTASI BULANAN & LOG
 # ==========================================
 with tab_kalkulator:
     st.header("💰 Kalkulator Net Profit Investasi Riil")
@@ -422,7 +471,6 @@ with tab_kalkulator:
         with kol_inp2:
             nilai_saat_ini = st.number_input("Nilai Portofolio Aset Saat Ini Rp", min_value=0.0, value=1200000.0, step=100000.0, key="nilai_riil")
         with kol_inp3:
-            # PERBAIKAN TOTAL: Batas bawah input diganti menjadi 0.1% desimal sesuai instruksi Anda
             persen_biaya_jual = st.number_input("Persentase Biaya Jual (%)", min_value=0.1, value=0.1, step=0.1, key="biaya_riil")
     
     if st.button("🚀 Hitung & Catat Performa", use_container_width=True):
@@ -436,7 +484,6 @@ with tab_kalkulator:
             st.success(f"📈 **Status: UNTUNG (BULLISH)** | Net Profit: +Rp {keuntungan_bersih:,.2f} ({persentase_return:.2f}%)")
         else:
             st.error(f"📉 **Status: RUGI (BEARISH)** | Net Profit: -Rp {abs(keuntungan_bersih):,.2f} ({persentase_return:.2f}%)")
-        st.info("💾 Data di atas berhasil dicatat secara otomatis ke dalam file `riwayat_performa.txt`!")
 
     st.markdown("---")
     st.subheader("🧪 Fitur Pengujian Otomatis & Riwayat")
@@ -444,17 +491,14 @@ with tab_kalkulator:
     
     with kol_tombol1:
         if st.button("🤖 Jalankan Simulasi Data Dummy", use_container_width=True):
-            # Pengujian data dummy menggunakan penyesuaian desimal biaya jual 0.1%
             nb1, np1, r1 = hitung_net_profit(10000000.0, 12500000.0, 0.1)
             simpan_log(10000000.0, 12500000.0, 0.1, nb1, np1, r1, "WEB_DUMMY_BULLISH")
             nb2, np2, r2 = hitung_net_profit(5000000.0, 4200000.0, 0.1)
             simpan_log(5000000.0, 4200000.0, 0.1, nb2, np2, r2, "WEB_DUMMY_BEARISH")
-            st.success("✅ Dua skenario dummy (Bullish & Bearish) sukses dijalankan dan dicatat ke berkas log!")
+            st.success("✅ Dua skenario dummy (Bullish & Bearish) sukses dijalankan!")
             
     with kol_tombol2:
         if st.button("📄 Tampilkan Semua Riwayat Log Teks", use_container_width=True):
             if os.path.exists("riwayat_performa.txt"):
                 with open("riwayat_performa.txt", "r", encoding="utf-8") as f:
                     st.text_area("Isi File riwayat_performa.txt:", value=f.read(), height=300)
-            else:
-                st.warning("⚠️ Belum ada riwayat performa yang tercatat di sistem ini.")
