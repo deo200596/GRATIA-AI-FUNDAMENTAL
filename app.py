@@ -194,7 +194,7 @@ with tab_sop:
             "* **Disiplin Konsistensi:** Target profit bersih harian yang realistis dan stabil adalah **+2% hingga +3%**."
         )
 # ==========================================
-# 3. TAB VOLUME SPIKE (ALGORITMA DETEKSI AKUMULASI)
+# 3. TAB VOLUME SPIKE
 # ==========================================
 with tab_spike:
     st.header("🕵️‍♂️ Analisis Taktik Volume Spike (Pelacak Jejak Bandar)")
@@ -342,24 +342,28 @@ with tab_bandarmologi:
             st.dataframe(df_adv, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT
+# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT (SEKARANG DENGAN % PROFIT & LOSS RIIL)
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
-    st.write("Proteksi otomatis dana uang belanja Anda agar terhindar dari kerugian besar.")
+    st.write("Proteksi otomatis modal dan estimasi persentase batas keuntungan dibanding risiko kerugian.")
     
     kol_r1, kol_r2 = st.columns(2)
     with kol_r1:
         total_modal_trading = st.number_input("Masukkan Total Modal Siap Pakai (Rp)", min_value=0.0, value=10000000.0, step=1000000.0)
-        persen_risiko_maks = st.slider("Toleransi Risiko per Transaksi (%)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
+        persen_risiko_maks = st.slider("Toleransi Risiko Capital per Transaksi (%)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
     with kol_r2:
         harga_beli_saham = st.number_input("Harga Rencana Beli Saham (Entry Price Rp)", min_value=1, value=1000, step=10)
-        harga_cut_loss = st.number_input("Harga Batas Batalkan Kerugian (Stop Loss Rp)", min_value=1, value=950, step=10)
+        harga_cut_loss = st.number_input("Harga Batas Batalkan Kerugian (Stop Loss Rp)", min_value=1, value=970, step=10)
+        harga_target_profit = st.number_input("Harga Estimasi Jual Untung (Take Profit Rp)", min_value=1, value=1060, step=10)
         
-    if st.button("⚖️ Hitung Batas Pembelian Lot", use_container_width=True):
+    if st.button("⚖️ Hitung Batas Pembelian Lot & Rasio Profitabilitas", use_container_width=True):
         if harga_beli_saham <= harga_cut_loss:
             st.error("Error: Harga Rencana Beli harus lebih besar daripada Harga Batas Cut Loss!")
+        elif harga_beli_saham >= harga_target_profit:
+            st.error("Error: Harga Target Profit harus lebih tinggi daripada Harga Rencana Beli!")
         else:
+            # Perhitungan Lot & Risiko Capital
             rupiah_risiko_maks = total_modal_trading * (persen_risiko_maks / 100)
             jarak_loss_per_lembar = harga_beli_saham - harga_cut_loss
             
@@ -367,16 +371,33 @@ with tab_risk:
             maks_lot_pembelian = maks_lembar_saham / 100
             total_uang_belanja = maks_lembar_saham * harga_beli_saham
             
-            st.markdown("---")
-            st.subheader("📊 Hasil Perhitungan Proteksi Modal")
+            # FITUR BARU: Menghitung persentase perkiraan Profit dan Loss teknikal saham
+            persen_perkiraan_loss = (jarak_loss_per_lembar / harga_beli_saham) * 100
+            jarak_profit_per_lembar = harga_target_profit - harga_beli_saham
+            persen_perkiraan_profit = (jarak_profit_per_lembar / harga_beli_saham) * 100
             
-            kol_h1, kol_h2, kol_h3 = st.columns(3)
+            # Hitung Risk-to-Reward Ratio
+            risk_reward_ratio = jarak_profit_per_lembar / jarak_loss_per_lembar
+            
+            st.markdown("---")
+            st.subheader("📊 Hasil Perhitungan Proteksi Modal & Persentase Profitabilitas")
+            
+            kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
             with kol_h1:
                 st.metric("Maksimal Pembelian", f"{int(maks_lot_pembelian)} Lot")
             with kol_h2:
-                st.metric("Uang Belanja Digunakan", f"Rp {total_uang_belanja:,.0f}")
+                st.metric("Uang Belanja Dipunakan", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3:
-                st.metric("Risiko Kerugian Maksimal", f"Rp {rupiah_risiko_maks:,.0f}")
+                st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%", delta_color="inverse")
+            with kol_h4:
+                st.metric("Perkiraan Profit (%)", f"+{persen_perkiraan_profit:.2f}%")
+                
+            st.markdown("---")
+            st.write(f"▶️ **Rasio Risk-to-Reward:** 1 : {risk_reward_ratio:.2f}")
+            if risk_reward_ratio >= 2.0:
+                st.success(f"⚖️ **Rekomendasi AI:** Transaksi ini **SANGAT LAYAK EXECUTED** karena potensi persentase profit (+{persen_perkiraan_profit:.2f}%) lebih dari 2 kali lipat dibanding risiko kerugian (-{persen_perkiraan_loss:.2f}%).")
+            else:
+                st.warning(f"⚖️ **Rekomendasi AI:** Transaksi ini **KURANG IDEAL**. Naikkan target profit Anda atau dekatkan harga cut-loss agar rasio keuntungan berbanding risiko lebih menguntungkan.")
 
 # ==========================================
 # 7. TAB KALKULATOR INVESTASI BULANAN & LOG
