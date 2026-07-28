@@ -79,7 +79,7 @@ def hitung_rsi_live(series, period=14):
     rs = avg_gain / avg_loss
     return (100 - (100 / (1 + rs))).iloc[-1]
 
-# CONFIG MENU TABS TERBARU (PENAMBAHAN MENU ADVANCED)
+# CONFIG MENU TABS TERBARU
 tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
     "⚡ Dashboard Scalping", 
     "📋 Panduan SOP",
@@ -216,7 +216,7 @@ with tab_predictive:
             df_predictive = df_predictive.sort_values(by="Skor Probabilitas AI", ascending=False)
             st.dataframe(df_predictive, use_container_width=True, hide_index=True)
 # ==========================================
-# 5. MENU BARU: TAB BANDARMOLOGI VWAP & MACD LIVE (OPTION A & C)
+# 5. TAB BANDARMOLOGI VWAP & MACD LIVE
 # ==========================================
 with tab_bandarmologi:
     st.header("📈 Menu Deteksi Bandarmologi VWAP & Momentum MACD")
@@ -235,15 +235,12 @@ with tab_bandarmologi:
                 
                 if len(s_close) >= 26:
                     h_kini = s_close.iloc[-1]
-                    
-                    # 1. OPTION A: Perhitungan Estimasi VWAP Proxy Teknikal 15 Hari
                     v_proxy = np.linspace(1, 1.5, len(s_close)) 
                     vwap_proxy = (s_close * v_proxy).rolling(window=15).sum() / pd.Series(v_proxy).rolling(window=15).sum().values
                     current_vwap = vwap_proxy.iloc[-1]
                     
                     status_bandar = "🐳 BIG ACCUMULATION" if h_kini > current_vwap else "📉 DISTRIBUTION"
                     
-                    # 2. OPTION C: Rumus Eksponensial MACD (EMA 12, EMA 26, & Signal 9)
                     ema12 = s_close.ewm(span=12, adjust=False).mean()
                     ema26 = s_close.ewm(span=26, adjust=False).mean()
                     macd_line = ema12 - ema26
@@ -268,22 +265,22 @@ with tab_bandarmologi:
         df_adv = pd.DataFrame(analisis_adv_list)
         if not df_adv.empty:
             st.dataframe(df_adv, use_container_width=True, hide_index=True)
-            st.info("💡 **Tips Profit:** Carilah emiten dengan status **BIG ACCUMULATION** disertai momentum **REVERSAL NAIK** untuk tingkat keberhasilan tertinggi.")
 
 # ==========================================
-# 6. MENU BARU: TAB MANAJEMEN RISIKO & KALKULATOR LOT (OPTION B)
+# 6. TAB MANAJEMEN RISIKO & KALKULATOR LOT (FIXED INTERFACE ERROR)
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
-    st.write("Proteksi otomatis dana uang belanja Anda agar terhindar dari kerugian besar (*anti-bangkrut*).")
+    st.write("Proteksi otomatis dana uang belanja Anda agar terhindar dari kerugian besar.")
     
     kol_r1, kol_r2 = st.columns(2)
     with kol_r1:
         total_modal_trading = st.number_input("Masukkan Total Modal Siap Pakai (Rp)", min_value=0.0, value=10000000.0, step=1000000.0)
         persen_risiko_maks = st.slider("Toleransi Risiko per Transaksi (%)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
     with kol_r2:
-        harga_beli_saham = st.number_input("Harga Rencana Beli Saham (Entry Price Rp)", min_value=1.0, value=1000, step=10)
-        harga_cut_loss = st.number_input("Harga Batas Batalkan Kerugian (Stop Loss Rp)", min_value=1.0, value=950, step=10)
+        # PERBAIKAN: Mengubah min_value menjadi bilangan bulat (int) agar seragam dan bebas error
+        harga_beli_saham = st.number_input("Harga Rencana Beli Saham (Entry Price Rp)", min_value=1, value=1000, step=10)
+        harga_cut_loss = st.number_input("Harga Batas Batalkan Kerugian (Stop Loss Rp)", min_value=1, value=950, step=10)
         
     if st.button("⚖️ Hitung Batas Pembelian Lot", use_container_width=True):
         if harga_beli_saham <= harga_cut_loss:
@@ -306,8 +303,6 @@ with tab_risk:
                 st.metric("Uang Belanja Digunakan", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3:
                 st.metric("Risiko Kerugian Maksimal", f"Rp {rupiah_risiko_maks:,.0f}")
-                
-            st.success(f"⚖️ **Rekomendasi AI:** Untuk membeli saham di harga Rp{harga_beli_saham} dengan Stop Loss di Rp{harga_cut_loss}, Anda **hanya boleh membeli maksimal {int(maks_lot_pembelian)} Lot** agar jika terkena cut loss, Anda hanya rugi Rp{rupiah_risiko_maks:,.0f} ({persen_risiko_maks}% dari modal).")
 
 # ==========================================
 # 7. TAB KALKULATOR INVESTASI BULANAN & LOG
