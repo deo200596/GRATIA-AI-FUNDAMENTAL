@@ -79,7 +79,7 @@ def hitung_rsi_live(series, period=14):
     rs = avg_gain / avg_loss
     return (100 - (100 / (1 + rs))).iloc[-1]
 
-# CONFIG MENU TABS (DENGAN TAMBAHAN MENU GRAFIK CANDLESTICK)
+# CONFIG MENU TABS
 tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
     "⚡ Dashboard Scalping", 
     "📊 Grafik Candlestick AI",
@@ -156,7 +156,7 @@ with tab_dashboard:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 2. MENU BARU: TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE (FIXED NO CANDLESTICK ERROR)
 # ==========================================
 with tab_chart:
     st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI")
@@ -167,27 +167,32 @@ with tab_chart:
     if ticker_pilihan:
         with st.spinner("Memproses grafik interaktif Plotly..."):
             try:
-                # Ambil data single ticker agar performa RAM 4 GB tetap enteng
                 df_single = yf.download(f"{ticker_pilihan}.JK", period="6mo", interval="1d", actions=False)
                 
                 if not df_single.empty:
+                    # FIX LOGIK: Jika kolom hasil download berupa multi-index, hilangkan level teratasnya (Ticker)
+                    if isinstance(df_single.columns, pd.MultiIndex):
+                        df_single.columns = df_single.columns.droplevel(1)
+                    
                     # Hitung Garis Indikator MA harian
                     df_single['MA5'] = df_single['Close'].rolling(window=5).mean()
                     df_single['MA20'] = df_single['Close'].rolling(window=20).mean()
                     
-                    # Logika Pencarian Titik Ideal untuk Visualisasi Isyarat
-                    buy_x = [df_single.index[-5]]  # Contoh penanda titik beli ideal bursa baru
+                    buy_x = [df_single.index[-5]]  
                     buy_y = [df_single['Low'].iloc[-5]]
-                    sell_x = [df_single.index[-1]] # Contoh penanda target jual ideal bursa baru
+                    sell_x = [df_single.index[-1]] 
                     sell_y = [df_single['High'].iloc[-1]]
                     
-                    # Gambar Desain Candlestick Plotly
                     fig = go.Figure()
                     
-                    # 1. Komponen Candlestick
+                    # 1. Komponen Candlestick (Kini kolom terjamin berupa Open, High, Low, Close tunggal)
                     fig.add_trace(go.Candlestick(
-                        x=df_single.index, open=df_single['Open'], high=df_single['High'],
-                        low=df_single['Low'], close=df_single['Close'], name="Candlestick"
+                        x=df_single.index, 
+                        open=df_single['Open'], 
+                        high=df_single['High'],
+                        low=df_single['Low'], 
+                        close=df_single['Close'], 
+                        name="Candlestick"
                     ))
                     
                     # 2. Komponen Garis MA5 & MA20
@@ -211,7 +216,7 @@ with tab_chart:
                     fig.update_layout(title=f"Tren Harga Historis {ticker_pilihan}.JK (6 Bulan)", xaxis_rangeslider_visible=False, height=500)
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.error(f"Emiten dengan kode {ticker_pilihan} tidak valid atau data bursa kosong.")
+                    st.error(f"Emiten dengan kode {ticker_pilihan} tidak ditemukan.")
             except Exception as e:
                 st.error(f"Gagal memuat chart: {str(e)}")
 # ==========================================
