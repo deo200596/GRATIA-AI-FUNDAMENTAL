@@ -422,8 +422,8 @@ with tab_kalkulator:
         with kol_inp2:
             nilai_saat_ini = st.number_input("Nilai Portofolio Aset Saat Ini Rp", min_value=0.0, value=1200000.0, step=100000.0, key="nilai_riil")
         with kol_inp3:
-            # PERBAIKAN: Diatur agar nilai input dimulai dari angka 1.0% secara default bursa
-            persen_biaya_jual = st.number_input("Persentase Biaya Jual (%)", min_value=1.0, value=1.0, step=0.1, key="biaya_riil")
+            # PERBAIKAN TOTAL: Batas bawah input diganti menjadi 0.1% desimal sesuai instruksi Anda
+            persen_biaya_jual = st.number_input("Persentase Biaya Jual (%)", min_value=0.1, value=0.1, step=0.1, key="biaya_riil")
     
     if st.button("🚀 Hitung & Catat Performa", use_container_width=True):
         nilai_transaksi_bersih, keuntungan_bersih, persentase_return = hitung_net_profit(modal, nilai_saat_ini, persen_biaya_jual)
@@ -444,10 +444,11 @@ with tab_kalkulator:
     
     with kol_tombol1:
         if st.button("🤖 Jalankan Simulasi Data Dummy", use_container_width=True):
-            nb1, np1, r1 = hitung_net_profit(10000000.0, 12500000.0, 1.0)
-            simpan_log(10000000.0, 12500000.0, 1.0, nb1, np1, r1, "WEB_DUMMY_BULLISH")
-            nb2, np2, r2 = hitung_net_profit(5000000.0, 4200000.0, 1.0)
-            simpan_log(5000000.0, 4200000.0, 1.0, nb2, np2, r2, "WEB_DUMMY_BEARISH")
+            # Pengujian data dummy menggunakan penyesuaian desimal biaya jual 0.1%
+            nb1, np1, r1 = hitung_net_profit(10000000.0, 12500000.0, 0.1)
+            simpan_log(10000000.0, 12500000.0, 0.1, nb1, np1, r1, "WEB_DUMMY_BULLISH")
+            nb2, np2, r2 = hitung_net_profit(5000000.0, 4200000.0, 0.1)
+            simpan_log(5000000.0, 4200000.0, 0.1, nb2, np2, r2, "WEB_DUMMY_BEARISH")
             st.success("✅ Dua skenario dummy (Bullish & Bearish) sukses dijalankan dan dicatat ke berkas log!")
             
     with kol_tombol2:
