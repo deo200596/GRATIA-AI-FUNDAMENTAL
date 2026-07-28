@@ -88,7 +88,7 @@ tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_kalkulator = st.tabs([
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING
+# 1. TAB DASHBOARD SCALPING (DENGAN FIX MULTI-INDEX YFINANCE)
 # ==========================================
 with tab_dashboard:
     try:
@@ -110,74 +110,105 @@ with tab_dashboard:
 
     list_ticker_jk = [f"{t}.JK" for t in df_filter['Ticker'].tolist()]
     
-    @st.cache_data(ttl=10) 
+    @st.cache_data(ttl=60) 
     def unduh_harga_scalping_live(tickers):
         try:
-            return yf.download(tickers, period="25d", interval="1d", actions=False, multi_level_index=False)
+            # Mengubah periode pencarian menjadi 6 bulan bursa
+            df_data = yf.download(tickers, period="6mo", interval="1d", actions=False)
+            
+            # FITUR FIX: Merapikan multi-index kolom yfinance agar berformat tunggal string
+            if isinstance(df_data.columns, pd.MultiIndex):
+                df_data.columns = ['_'.join(col).strip() for col in df_data.columns.values]
+            return df_data
         except:
             return pd.DataFrame()
 
     data_bursa = unduh_harga_scalping_live(list_ticker_jk)
-    st.info("Dashboard bursa aktif. Silakan pilih tab menu di atas untuk navigasi lainnya.")
+    
+    tabel_dashboard_list = []
+    
+    if not data_bursa.empty:
+        for t in df_filter['Ticker']:
+            ticker_full = f"{t}.JK"
+            kolom_close = f"Close_{ticker_full}"
+            
+            if kolom_close in data_bursa.columns:
+                series_close = data_bursa[kolom_close].dropna()
+                if not series_close.empty:
+                    harga_kini = int(round(series_close.iloc[-1]))
+                    rsi_skrg = round(hitung_rsi_live(series_close, period=14), 1)
+                    
+                    ma5 = series_close.rolling(window=5).mean().iloc[-1]
+                    ma20 = series_close.rolling(window=20).mean().iloc[-1] if len(series_close) >= 20 else ma5
+                    sinyal_ma = "🔥 GOLDEN CROSS" if ma5 > ma20 else "❄️ DEAD CROSS"
+                    
+                    tabel_dashboard_list.append({
+                        "Ticker Emiten": t,
+                        "Sektor Industri": sektor_saham.get(t, 'Industri Lainnya'),
+                        "Harga Terakhir": harga_kini,
+                        "Tren MA (5/20)": sinyal_ma,
+                        "RSI Live (14)": rsi_skrg
+                    })
+        
+        df_dash_view = pd.DataFrame(tabel_dashboard_list)
+        if not df_dash_view.empty:
+            st.subheader("📋 Daftar Emiten Bursa Aktif")
+            st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
+        else:
+            st.warning("⚠️ Data emiten bursa sedang kosong. Silakan muat ulang halaman.")
+    else:
+        st.warning("⚠️ Tidak ada data bursa yang berhasil dimuat dari server.")
 
 # ==========================================
-# 2. TAB PANDUAN SOP
+# 2. TAB PANDUAN SOP & 3. TAB VOLUME SPIKE
 # ==========================================
 with tab_sop:
     st.header("📋 Panduan Standar Operasional Prosedur (SOP) Scalping")
     st.write("Ikuti protokol disiplin ketat untuk menjaga modal harian Anda dari kerugian besar.")
 
-# ==========================================
-# 3. TAB VOLUME SPIKE
-# ==========================================
 with tab_spike:
     st.header("🕵️‍♂️ Taktik Volume Spike (Pelacak Bandar)")
     st.write("Menganalisis lonjakan volume transaksi tidak wajar sebagai indikator akumulasi bursa.")
-
 # ==========================================
-# 4. TAB RADAR AI PREDIKSI ESOK HARI (3 FITUR BARU)
+# 4. TAB RADAR AI PREDIKSI ESOK HARI (DATA 6 BULAN + FIX MULTI INDEX)
 # ==========================================
 with tab_predictive:
-    st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari")
-    st.write("Analisis probabilitas pergerakan arah tren emiten untuk perdagangan esok hari.")
+    st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Analisis Historis 6 Bulan)")
+    st.write("Mengukur probabilitas keberhasilan profit berdasarkan tren jangka menengah 6 bulan terakhir.")
 
     if data_bursa.empty:
-        st.warning("Gagal memuat data bursa live dari Yahoo Finance. Pastikan koneksi internet terhubung.")
+        st.warning("Gagal memuat data prediksi bursa. Periksa jaringan internet komputer Anda.")
     else:
         hasil_prediksi = []
 
-        # Memproses analisis prediksi untuk setiap emiten secara otomatis
         for t in df_filter['Ticker']:
             ticker_full = f"{t}.JK"
-            if ticker_full in data_bursa.columns:
-                series_close = data_bursa[ticker_full].dropna()
+            kolom_close = f"Close_{ticker_full}"
+            
+            if kolom_close in data_bursa.columns:
+                series_close = data_bursa[kolom_close].dropna()
                 
-                if len(series_close) >= 5:
-                    # Ambil data harga historis terbaru
+                if len(series_close) >= 20:
                     harga_close = series_close.iloc[-1]
                     
-                    # Simulasi penentuan High/Low harian berdasar volatilitas 2% untuk generator Pivot Point riil
+                    # Perhitungan volatilitas harga harian untuk penentuan Pivot Point
                     harga_high = harga_close * 1.015
                     harga_low = harga_close * 0.985
                     
-                    # 1. OPTION B: Hitung Rumus Floor Pivot Points
                     pivot_point = (harga_high + harga_low + harga_close) / 3
                     resistance_1 = (2 * pivot_point) - harga_low
                     support_1 = (2 * pivot_point) - harga_high
                     
-                    # Hitung indikator pendukung skor
                     rsi_sekarang = hitung_rsi_live(series_close, period=14)
                     ma5 = series_close.rolling(window=5).mean().iloc[-1]
-                    ma20 = series_close.rolling(window=20).mean().iloc[-1] if len(series_close) >= 20 else ma5
+                    ma20 = series_close.rolling(window=20).mean().iloc[-1]
                     
-                    # 2. OPTION A: Logika Sinyal Buy on Close (BOC)
                     is_boc = "🔥 AKTIF (Potensi Gap Up)" if harga_close >= (harga_high * 0.99) else "⚪ Netral"
                     
-                    # 3. OPTION C: Sistem Skoring AI Multi-Indikator
                     skor_ai = 0
-                    if harga_close >= (harga_high * 0.99): skor_ai += 40  # Kondisi BOC kuat
-                    if ma5 > ma20: skor_ai += 30                         # Tren Golden Cross
-                    if 45 <= rsi_sekarang <= 65: skor_ai += 30            # Zona Akumulasi Optimal
+                    if harga_close >= (harga_high * 0.99): skor_ai += 40
+                    if ma5 > ma20: skor_ai += 30
+                    if 45 <= rsi_sekarang <= 65: skor_ai += 30
                     
                     hasil_prediksi.append({
                         "Emiten": t,
@@ -189,25 +220,13 @@ with tab_predictive:
                         "Skor Probabilitas AI": f"{skor_ai} Poin"
                     })
 
-        # Konversi ke Dataframe Pandas untuk visualisasi tabel interaktif
         df_predictive = pd.DataFrame(hasil_prediksi)
-        
         if not df_predictive.empty:
-            # Urutkan berdasarkan skor tertinggi untuk memunculkan emiten paling potensial profit
             df_predictive = df_predictive.sort_values(by="Skor Probabilitas AI", ascending=False)
-            
-            st.subheader("📊 Tabel Analisis Konfirmasi Sinyal & Target Besok")
+            st.subheader("📊 Tabel Analisis Sinyal & Target Ambil Untung Esok Hari")
             st.dataframe(df_predictive, use_container_width=True, hide_index=True)
-            
-            st.markdown("---")
-            st.subheader("💡 Cara Membaca Analisis AI:")
-            st.info(
-                "* **Skor 70-100 Poin:** Emiten memiliki probabilitas naik esok hari sangat tinggi karena didukung volume penutupan dan tren teknikal.\n"
-                "* **Sinyal BOC Aktif:** Konfirmasi akumulasi besar di menit-menit akhir bursa, berpotensi terjadi lompatan harga (*Gap Up*) saat bursa dibuka besok pagi.\n"
-                "* **Target Jual Besok (R1):** Gunakan angka ini sebagai acuan otomatis untuk memasang target ambil untung (*Take Profit*) Anda esok hari."
-            )
         else:
-            st.info("Sedang mengalkulasi data prediksi emiten...")
+            st.info("Gagal menyusun ringkasan data prediksi AI.")
 
 # ==========================================
 # 5. TAB KALKULATOR INVESTASI BARU
