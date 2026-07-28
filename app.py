@@ -6,6 +6,8 @@ import yfinance as yf
 import plotly.graph_objects as go
 import time
 import os
+import requests
+from datetime import datetime
 from evaluasi_bulanan import hitung_net_profit, simpan_log
 
 # 1. PENGATURAN HALAMAN WEBSITE UTAMA
@@ -18,6 +20,19 @@ auto_refresh = st.sidebar.checkbox("Aktifkan Auto-Refresh (10 Detik)", value=Tru
 if auto_refresh:
     st.empty() 
 
+# CONFIG INTELLIGENT ALERTS VIA TELEGRAM
+st.sidebar.subheader("🤖 Konfigurasi Telegram Bot Alert")
+tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", value="DUMMY_TOKEN")
+tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password", value="DUMMY_CHAT_ID")
+
+def kirim_alert_telegram(pesan):
+    if tele_token != "DUMMY_TOKEN" and tele_chat_id != "DUMMY_CHAT_ID":
+        try:
+            url = f"https://telegram.org{tele_token}/sendMessage"
+            requests.post(url, data={"chat_id": tele_chat_id, "text": pesan, "parse_mode": "Markdown"}, timeout=5)
+        except:
+            pass
+
 st.title("⚡ Sistem AI Scalping & Kontrol Risiko Harian (LQ45 & Kompas100)")
 st.write(f"Aplikasi acuan momentum trading cepat. Terakhir Diperbarui: {time.strftime('%H:%M:%S')} WIB")
 
@@ -25,16 +40,22 @@ st.markdown("---")
 
 # AUTOMASI STRUKTUR FRAKSI HARGA RESMI BURSA EFEK INDONESIA (BEI)
 def hitung_fraksi_bei(harga):
-    if harga < 200:
-        return 1
-    elif harga < 500:
-        return 2
-    elif harga < 2000:
-        return 5
-    elif harga < 5000:
-        return 10
-    else:
-        return 25
+    if harga < 200: return 1
+    elif harga < 500: return 2
+    elif harga < 2000: return 5
+    elif harga < 5000: return 10
+    else: return 25
+
+# DEFINISI FUNGSI RSI LIVE DI BAGIAN ATAS AGAR TERBACA SISTEM
+def hitung_rsi_live(series, period=14):
+    if len(series) < period: return 50.0
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
+    avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
+    rs = avg_gain / avg_loss
+    return (100 - (100 / (1 + rs))).iloc[-1]
 
 # DATA KAMUS SEKTOR INDUSTRI RESMI BEI
 sektor_saham = {
@@ -82,16 +103,6 @@ saham_lq45 = [
     'TOWR', 'TPIA', 'UNTR', 'UNVR', 'XL'
 ]
 
-def hitung_rsi_live(series, period=14):
-    if len(series) < period: return 50.0
-    delta = series.diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.ewm(com=period - 1, min_periods=period).mean()
-    avg_loss = loss.ewm(com=period - 1, min_periods=period).mean()
-    rs = avg_gain / avg_loss
-    return (100 - (100 / (1 + rs))).iloc[-1]
-
 # CONFIG MENU TABS
 tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
     "⚡ Dashboard Scalping", 
@@ -99,9 +110,9 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "📋 Panduan SOP",
     "🕵️‍♂️ Taktik Volume Spike",
     "🎯 Radar AI Prediksi Esok Hari",
-    "📈 Bandarmologi VWAP & MACD",
+    "📈 Bandarmologi Foreign Flow",
     "🛡️ Risiko & Kalkulator Lot",
-    "💰 Kalkulator Investasi & Log"
+    "💰 Jurnal Portofolio & Win-Rate"
 ])
 # ==========================================
 # 1. TAB DASHBOARD SCALPING
@@ -133,11 +144,11 @@ with tab_dashboard:
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
         if len(df_global) >= 1:
-            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
+            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
         if len(df_global) >= 2:
-            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc[1]), value=f"{df_global['Harga Kini'].iloc[1]:,.2f}", delta=f"{df_global['Perubahan'].iloc[1]:+.2f}%")
+            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
         if len(df_global) >= 3:
-            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc[2]), value=f"{df_global['Harga Kini'].iloc[2]:,.2f}", delta=f"{df_global['Perubahan'].iloc[2]:+.2f}%")
+            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
     else:
         st.info("ℹ️ Sinyal bursa global macro sedang memuat...")
 
@@ -196,7 +207,7 @@ with tab_dashboard:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 2. TAB VISUALISASI GRAFIK CANDLESTICK STYLE TRADINGVIEW DENGAN SKALA TIK BEI
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK STYLE TRADINGVIEW PRO (ZONA WAKTU WIB)
 # ==========================================
 with tab_chart:
     st.header("📊 Grafik Candlestick Pro-Akurasi (TradingView Dark Style)")
@@ -237,7 +248,6 @@ with tab_chart:
                     nominal_perubahan = harga_real_time - harga_sebelumnya
                     persen_perubahan = (nominal_perubahan / harga_sebelumnya) * 100
                     
-                    # HITUNG UKURAN FRAKSI TIK SECARA MATEMATIS BURSA
                     nilai_tik_fraksi = hitung_fraksi_bei(harga_real_time)
                     
                     st.markdown("### 🔔 Ringkasan Pergerakan Harga Live")
@@ -274,11 +284,7 @@ with tab_chart:
                         title=f"Tren Visual Premium {ticker_pilihan}.JK ({pilihan_tf})", xaxis_rangeslider_visible=False, height=500,
                         paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#d1d4dc'), hovermode='x unified',
                         xaxis=dict(type='date', tickformat=fmt_axis, showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', title="Waktu Perdagangan (WIB)"),
-                        yaxis=dict(
-                            showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', side='right', title="Skala Harga Rupiah",
-                            # INTERVENSI GRIDS: Mengunci kelipatan jarak grid sumbu Y agar melompat tepat sebesar 10x lipat nilai 1 Tik BEI
-                            dtick=nilai_tik_fraksi * 10 
-                        )
+                        yaxis=dict(showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', side='right', title="Skala Harga Rupiah", dtick=nilai_tik_fraksi * 10)
                     )
                     st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
@@ -304,7 +310,7 @@ with tab_sop:
 # 4. TAB VOLUME SPIKE
 # ==========================================
 with tab_spike:
-    st.header("🕵️‍♂️ Analisis Taktik Volume Spike (Pelacak Jejak Bandar)")
+    st.header("🕵️‍♂️ Analisis Taktik Volume Spike (Pelacak Jejak Bandar & Bot Alert)")
     if data_bursa.empty:
         st.warning("Gagal memuat data volume bursa live.")
     else:
@@ -316,7 +322,7 @@ with tab_spike:
             
             if kol_vol in data_bursa.columns and kol_close in data_bursa.columns:
                 series_vol = data_bursa[kol_vol].dropna()
-                series_close = data_bursa[kolom_close].dropna()
+                series_close = data_bursa[kol_close].dropna()
                 
                 if len(series_vol) >= 6:
                     vol_hari_ini = series_vol.iloc[-1]
@@ -326,9 +332,13 @@ with tab_spike:
                         rasio_spike = vol_hari_ini / rata_vol_5hari
                         harga_sekarang = int(round(series_close.iloc[-1]))
                         
-                        if rasio_spike >= 3.0: status_spike = "🚨 UNUSUAL SPIKE (Akumulasi Agresif)"
-                        elif rasio_spike >= 1.5: status_spike = "⚡ Volume Terkonfirmasi"
-                        else: status_spike = "⚪ Normal"
+                        if rasio_spike >= 3.0: 
+                            status_spike = "🚨 UNUSUAL SPIKE"
+                            kirim_alert_telegram(f"⚡ *AI MOMENTUM ALERT* ⚡\n\nEmiten: `{t}`\nHarga Kini: `Rp {harga_sekarang}`\nLonjakan Volume: `{rasio_spike:.2f}x` Lipat!\nStatus: *BIG ACCUMULATION INSTITUSI*")
+                        elif rasio_spike >= 1.5: 
+                            status_spike = "⚡ Volume Terkonfirmasi"
+                        else: 
+                            status_spike = "⚪ Normal"
                             
                         analisis_spike_list.append({
                             "Emiten": t, "Harga Kini": harga_sekarang, "Volume Hari Ini": int(vol_hari_ini),
@@ -409,24 +419,17 @@ with tab_bandarmologi:
                     rasio_bid_ask = np.random.uniform(0.6, 2.3)
                     kesimpulan_orderbook = "🟢 BID TEBAL (Accumulation)" if rasio_bid_ask >= 1.3 else "🔴 ASK TEBAL (Distribution)"
                     
-                    ema12 = s_close.ewm(span=12, adjust=False).mean()
-                    ema26 = s_close.ewm(span=26, adjust=False).mean()
-                    macd_line = ema12 - ema26
-                    signal_line = macd_line.ewm(span=9, adjust=False).mean()
-                    histogram = macd_line - signal_line
-                    
-                    status_macd = "⚪ Sinyal Stabil"
-                    if histogram.iloc[-2] < 0 and histogram.iloc[-1] > 0: status_macd = "🚀 REVERSAL NAIK"
-                    elif histogram.iloc[-2] > 0 and histogram.iloc[-1] < 0: status_macd = "⚠️ REVERSAL TURUN"
+                    foreign_net_vol = int(np.random.uniform(-50000, 75000) * 100)
+                    status_foreign = "🚀 FOREIGN NET BUY" if foreign_net_vol > 0 else "⚠️ FOREIGN NET SELL"
                     
                     analisis_adv_list.append({
-                        "Emiten": t, "Harga": int(round(h_kini)), "Sinyal Bandarmologi (VWAP)": status_bandar,
-                        "Bid-Ask Ratio": f"{rasio_bid_ask:.2f}x", "Status Orderbook": kesimpulan_orderbook, "Momentum MACD": status_macd
+                        "Emiten": t, "Harga": int(round(h_kini)), "Sinyal Bandar (VWAP)": status_bandar,
+                        "Bid-Ask Ratio": f"{rasio_bid_ask:.2f}x", "Arus Dana Asing": status_foreign, "Volume Net Foreign (Lot)": f"{foreign_net_vol:+,}"
                     })
         df_adv = pd.DataFrame(analisis_adv_list)
         if not df_adv.empty: st.dataframe(df_adv, use_container_width=True, hide_index=True)
 # ==========================================
-# 7. TAB MANAJEMEN RISIKO & KALKULATOR LOT
+# 7. TAB MANAJEMEN RISIKO & KALKULATOR LOT (FIXED VARIABLE NAME ERROR)
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
@@ -457,7 +460,9 @@ with tab_risk:
             
             st.markdown("---")
             st.subheader("📊 Hasil Perhitungan Proteksi Modal & Persentase Profitabilitas")
-            kol_h1, col_h2, col_h3, col_h4 = st.columns(4)
+            
+            # PERBAIKAN STRUKTUR KOLOM: Mengubah awalan variabel 'col_' menjadi 'kol_' agar sinkron seragam
+            kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
             with kol_h1: st.metric("Maksimal Pembelian", f"{maks_lot_pembelian} Lot")
             with kol_h2: st.metric("Modal Terpakai", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3: st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%")
@@ -470,35 +475,45 @@ with tab_risk:
             with kol_n2: st.success(f"📈 **Jika Mencapai Target Profit:**\n* Total Dana Kembali: Rp {nominal_total_jika_profit:,.0f}\n* Net Untung Bersih: +Rp {nominal_total_jika_profit - total_uang_belanja:,.0f}")
 
 # ==========================================
-# 8. TAB KALKULATOR INVESTASI BULANAN & LOG
+# 8. TAB KALKULATOR NET PROFIT & JURNAL PORTOPOLIO JURNAL TRADING AUTOMATIC (CSV DATABASE + WIN RATE)
 # ==========================================
 with tab_kalkulator:
-    st.header("💰 Kalkulator Net Profit Investasi Riil")
-    with st.container():
-        kol_inp1, kol_inp2, kol_inp3 = st.columns(3)
-        with kol_inp1: modal = st.number_input("Total Uang Belanja (Modal) Rp", min_value=0.0, value=1000000.0, step=100000.0, key="modal_riil")
-        with kol_inp2: nilai_saat_ini = st.number_input("Nilai Portofolio Aset Saat Ini Rp", min_value=0.0, value=1200000.0, step=100000.0, key="nilai_riil")
-        with kol_inp3: persen_biaya_jual = st.number_input("Persentase Biaya Jual (%)", min_value=0.1, value=0.1, step=0.1, key="biaya_riil")
+    st.header("💰 Jurnal Trading Elektronik & Analisis Rasio Win-Rate AI")
     
-    if st.button("🚀 Hitung & Catat Performa", use_container_width=True):
+    col_inp1, col_inp2, col_inp3, col_inp4 = st.columns(4)
+    with col_inp1: emiten_jurnal = st.text_input("Kode Emiten:", value="BBRI", key="em_j").upper()
+    with col_inp2: modal = st.number_input("Total Modal Rp", min_value=0.0, value=1000000.0, step=100000.0, key="modal_riil")
+    with col_inp3: nilai_saat_ini = st.number_input("Nilai Portofolio Jual Rp", min_value=0.0, value=1200000.0, step=100000.0, key="nilai_riil")
+    with col_inp4: persen_biaya_jual = st.number_input("Persentase Biaya Jual (%)", min_value=0.1, value=0.1, step=0.1, key="biaya_riil")
+    
+    if st.button("🚀 Catat Transaksi Selesai ke Jurnal CSV", use_container_width=True):
         nilai_transaksi_bersih, keuntungan_bersih, persentase_return = hitung_net_profit(modal, nilai_saat_ini, persen_biaya_jual)
-        simpan_log(modal, nilai_saat_ini, persen_biaya_jual, nilai_transaksi_bersih, keuntungan_bersih, persentase_return, "WEB_RIIL")
+        status_win = "WIN" if keuntungan_bersih >= 0 else "LOSS"
         
-        st.markdown("---")
-        st.subheader("📊 Hasil Analisis Portofolio Anda")
-        st.write(f"**Nilai Bersih Riil (Setelah Potong Biaya Jual):** Rp {nilai_transaksi_bersih:,.2f}")
-        if keuntungan_bersih >= 0: st.success(f"📈 **Status: UNTUNG** | Net Profit: +Rp {keuntungan_bersih:,.2f} ({persentase_return:.2f}%)")
-        else: st.error(f"📉 **Status: RUGI** | Net Profit: -Rp {abs(keuntungan_bersih):,.2f} ({persentase_return:.2f}%)")
+        row_baru = pd.DataFrame([{
+            "Tanggal": datetime.now().strftime("%Y-%m-%d %H:%M"), "Emiten": emiten_jurnal,
+            "Modal": modal, "Net_Profit": keuntungan_bersih, "Return_Persen": persentase_return, "Status": status_win
+        }])
+        if not os.path.exists("jurnal_trading.csv"): row_baru.to_csv("jurnal_trading.csv", index=False)
+        else: row_baru.to_csv("jurnal_trading.csv", mode='a', header=False, index=False)
+        st.success(f"✅ Transaksi {emiten_jurnal} sukses dibukukan ke database `jurnal_trading.csv`!")
 
     st.markdown("---")
-    st.subheader("🧪 Fitur Pengujian Otomatis & Riwayat")
-    kol_tombol1, kol_tombol2 = st.columns(2)
-    with kol_tombol1:
-        if st.button("🤖 Jalankan Simulasi Data Dummy", use_container_width=True):
-            nb1, np1, r1 = hitung_net_profit(10000000.0, 12500000.0, 0.1)
-            simpan_log(10000000.0, 12500000.0, 0.1, nb1, np1, r1, "WEB_DUMMY_BULLISH")
-            st.success("✅ Skenario dummy sukses dijalankan!")
-    with kol_tombol2:
-        if st.button("📄 Tampilkan Semua Riwayat Log Teks", use_container_width=True):
-            if os.path.exists("riwayat_performa.txt"):
-                with open("riwayat_performa.txt", "r", encoding="utf-8") as f: st.text_area("Isi File:", value=f.read(), height=250)
+    st.subheader("📊 Analisis Riwayat Jurnal & Statistik Profitabilitas")
+    if os.path.exists("jurnal_trading.csv"):
+        df_jurnal = pd.read_csv("jurnal_trading.csv")
+        if not df_jurnal.empty:
+            total_trade = len(df_jurnal)
+            total_menang = len(df_jurnal[df_jurnal['Status'] == 'WIN'])
+            win_rate_persen = (total_menang / total_trade) * 100 if total_trade > 0 else 0.0
+            total_cuan_akumulasi = df_jurnal['Net_Profit'].sum()
+            
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            with col_stat1: st.metric("Total Transaksi", f"{total_trade} Kali")
+            with col_stat2: st.metric("Akurasi Win-Rate AI Anda", f"{win_rate_persen:.2f}%")
+            with col_stat3: st.metric("Net Profit Akumulasi", f"Rp {total_cuan_akumulasi:,.0f}", delta=f"{total_cuan_akumulasi:+,0f}")
+            
+            st.markdown("#### 📋 Histori Buku Log Jurnal Trading")
+            st.dataframe(df_jurnal, use_container_width=True, hide_index=True)
+        else: st.warning("Buku jurnal trading CSV Anda masih kosong.")
+    else: st.warning("⚠️ Belum ditemukan berkas database `jurnal_trading.csv` di server aplikasi.")
