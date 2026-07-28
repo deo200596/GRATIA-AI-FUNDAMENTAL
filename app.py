@@ -156,11 +156,11 @@ with tab_dashboard:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE (FIXED NO CANDLESTICK ERROR)
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MOVING AVERAGE (AKTIF AXIS TANGGAL DI BAWAH)
 # ==========================================
 with tab_chart:
     st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI")
-    st.write("Visualisasi pergerakan harga 6 bulan dilengkapi garis MA5, MA20, serta penanda titik entry beli dan jual ideal.")
+    st.write("Visualisasi pergerakan harga 6 bulan dilengkapi garis MA5, MA20, serta penanda tanggal bursa di sisi bawah.")
     
     ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI").strip().upper()
     
@@ -170,7 +170,6 @@ with tab_chart:
                 df_single = yf.download(f"{ticker_pilihan}.JK", period="6mo", interval="1d", actions=False)
                 
                 if not df_single.empty:
-                    # FIX LOGIK: Jika kolom hasil download berupa multi-index, hilangkan level teratasnya (Ticker)
                     if isinstance(df_single.columns, pd.MultiIndex):
                         df_single.columns = df_single.columns.droplevel(1)
                     
@@ -185,14 +184,10 @@ with tab_chart:
                     
                     fig = go.Figure()
                     
-                    # 1. Komponen Candlestick (Kini kolom terjamin berupa Open, High, Low, Close tunggal)
+                    # 1. Komponen Candlestick
                     fig.add_trace(go.Candlestick(
-                        x=df_single.index, 
-                        open=df_single['Open'], 
-                        high=df_single['High'],
-                        low=df_single['Low'], 
-                        close=df_single['Close'], 
-                        name="Candlestick"
+                        x=df_single.index, open=df_single['Open'], high=df_single['High'],
+                        low=df_single['Low'], close=df_single['Close'], name="Candlestick"
                     ))
                     
                     # 2. Komponen Garis MA5 & MA20
@@ -213,7 +208,18 @@ with tab_chart:
                         name='Titik Jual Ideal (Sell)'
                     ))
                     
-                    fig.update_layout(title=f"Tren Harga Historis {ticker_pilihan}.JK (6 Bulan)", xaxis_rangeslider_visible=False, height=500)
+                    # FIX UPDATE: Mengaktifkan penampilan tanggal di sumbu bawah (X-Axis) secara absolut
+                    fig.update_layout(
+                        title=f"Tren Harga Historis {ticker_pilihan}.JK (6 Bulan)",
+                        xaxis_rangeslider_visible=False,
+                        height=500,
+                        xaxis=dict(
+                            type='date',                 # Memaksa tipe data sumbu X menjadi format tanggal
+                            tickformat='%Y-%m-%d',       # Menentukan format penulisan (Tahun-Bulan-Tanggal)
+                            showgrid=True,               # Memunculkan garis kisi-kiri bantuan vertikal
+                            title="Tanggal Transaksi Bursa" # Label keterangan teks sumbu bawah
+                        )
+                    )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.error(f"Emiten dengan kode {ticker_pilihan} tidak ditemukan.")
