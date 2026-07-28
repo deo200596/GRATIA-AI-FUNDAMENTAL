@@ -91,39 +91,48 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (FIXED INDEX DATA OUT-OF-BOUNDS)
+# 1. TAB DASHBOARD SCALPING (FIXED INDEKS GLOBAL MASIH KOSONG)
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
     
     @st.cache_data(ttl=300)
-    def unduh_sentimen_global():
+    def unduh_sentimen_global_fixed():
         try:
             indeks_dict = {"IHSG (^JKSE)": "^JKSE", "S&P 500 (^GSPC)": "^GSPC", "Nikkei 225 (^N225)": "^N225"}
             global_data = []
             for nama, ticker in indeks_dict.items():
-                df_indeks = yf.download(ticker, period="2d", interval="1d", actions=False)
+                df_indeks = yf.download(ticker, period="5d", interval="1d", actions=False)
                 if not df_indeks.empty and len(df_indeks) >= 2:
                     if isinstance(df_indeks.columns, pd.MultiIndex):
                         df_indeks.columns = df_indeks.columns.droplevel(1)
-                    c_now = df_indeks['Close'].iloc[-1]
-                    c_prev = df_indeks['Close'].iloc[-2]
+                    
+                    df_clean = df_indeks.dropna(subset=['Close'])
+                    c_now = float(df_clean['Close'].iloc[-1])
+                    c_prev = float(df_clean['Close'].iloc[-2])
                     pct_change = ((c_now - c_prev) / c_prev) * 100
-                    global_data.append({"Indeks": nama, "Harga Kini": f"{c_now:,.2f}", "Perubahan": f"{pct_change:+.2f}%"})
+                    global_data.append({"Indeks": nama, "Harga Kini": c_now, "Perubahan": pct_change})
             return pd.DataFrame(global_data)
         except:
             return pd.DataFrame()
 
-    df_global = unduh_sentimen_global()
+    df_global = unduh_sentimen_global_fixed()
     
-    # PERBAIKAN PROTEKSI KUNCI UTAMA: Hanya cetak kotak metrik jika data 3 indeks lengkap
-    if not df_global.empty and len(df_global) >= 3:
-        col_g1, col_n1, col_n2 = st.columns(3)
-        with col_g1: st.metric(df_global['Indeks'].iloc[0], df_global['Harga Kini'].iloc[0], df_global['Perubahan'].iloc[0])
-        with col_n1: st.metric(df_global['Indeks'].iloc[1], df_global['Harga Kini'].iloc[1], df_global['Perubahan'].iloc[1])
-        with col_n2: st.metric(df_global['Indeks'].iloc[2], df_global['Harga Kini'].iloc[2], df_global['Perubahan'].iloc[2])
+    # PERBAIKAN TOTAL FORMAT METRIK: Menjamin syntax pembacaan data array pandas tepat sasaran
+    if not df_global.empty and len(df_global) >= 1:
+        kol_g1, kol_n1, kol_n2 = st.columns(3)
+        
+        # Cetak aman indeks bursa ke-1 (IHSG)
+        if len(df_global) >= 1:
+            with kol_g1: st.metric(label=df_global['Indeks'].iloc[0], value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
+        # Cetak aman indeks bursa ke-2 (S&P 500)
+        if len(df_global) >= 2:
+            with kol_n1: st.metric(label=df_global['Indeks'].iloc[1], value=f"{df_global['Harga Kini'].iloc[1]:,.2f}", delta=f"{df_global['Perubahan'].iloc[1]:+.2f}%")
+        # Cetak aman indeks bursa ke-3 (Nikkei 225)
+        if len(df_global) >= 3:
+            with kol_n2: st.metric(label=df_global['Indeks'].iloc[2], value=f"{df_global['Harga Kini'].iloc[2]:,.2f}", delta=f"{df_global['Perubahan'].iloc[2]:+.2f}%")
     else:
-        st.info("ℹ️ Sinyal bursa global macro sedang memuat atau beberapa pasar regional sedang libur.")
+        st.info("ℹ️ Sinyal bursa global macro sedang memuat, pastikan server terhubung ke bursa.")
 
     st.markdown("---")
     try:
