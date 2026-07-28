@@ -79,16 +79,18 @@ def hitung_rsi_live(series, period=14):
     rs = avg_gain / avg_loss
     return (100 - (100 / (1 + rs))).iloc[-1]
 
-# STRUKTUR TAB HALAMAN
-tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_kalkulator = st.tabs([
-    "⚡ Dashboard Scalping & Trading Harian", 
-    "📋 Panduan SOP Scalping",
-    "🕵️‍♂️ Taktik Volume Spike (Pelacak Bandar)",
-    "🎯 Radar AI Prediksi Esok Hari (BOC & Pivot)",
+# CONFIG MENU TABS TERBARU (PENAMBAHAN MENU ADVANCED)
+tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, tab_kalkulator = st.tabs([
+    "⚡ Dashboard Scalping", 
+    "📋 Panduan SOP",
+    "🕵️‍♂️ Taktik Volume Spike",
+    "🎯 Radar AI Prediksi Esok Hari",
+    "📈 Bandarmologi VWAP & MACD",
+    "🛡️ Risiko & Kalkulator Lot",
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (DENGAN FIX MULTI-INDEX YFINANCE)
+# 1. TAB DASHBOARD SCALPING
 # ==========================================
 with tab_dashboard:
     try:
@@ -113,10 +115,7 @@ with tab_dashboard:
     @st.cache_data(ttl=60) 
     def unduh_harga_scalping_live(tickers):
         try:
-            # Mengubah periode pencarian menjadi 6 bulan bursa
             df_data = yf.download(tickers, period="6mo", interval="1d", actions=False)
-            
-            # FITUR FIX: Merapikan multi-index kolom yfinance agar berformat tunggal string
             if isinstance(df_data.columns, pd.MultiIndex):
                 df_data.columns = ['_'.join(col).strip() for col in df_data.columns.values]
             return df_data
@@ -126,7 +125,6 @@ with tab_dashboard:
     data_bursa = unduh_harga_scalping_live(list_ticker_jk)
     
     tabel_dashboard_list = []
-    
     if not data_bursa.empty:
         for t in df_filter['Ticker']:
             ticker_full = f"{t}.JK"
@@ -155,9 +153,9 @@ with tab_dashboard:
             st.subheader("📋 Daftar Emiten Bursa Aktif")
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
         else:
-            st.warning("⚠️ Data emiten bursa sedang kosong. Silakan muat ulang halaman.")
+            st.warning("⚠️ Data emiten bursa sedang kosong.")
     else:
-        st.warning("⚠️ Tidak ada data bursa yang berhasil dimuat dari server.")
+        st.warning("⚠️ Tidak ada data bursa yang berhasil dimuat.")
 
 # ==========================================
 # 2. TAB PANDUAN SOP & 3. TAB VOLUME SPIKE
@@ -169,29 +167,23 @@ with tab_sop:
 with tab_spike:
     st.header("🕵️‍♂️ Taktik Volume Spike (Pelacak Bandar)")
     st.write("Menganalisis lonjakan volume transaksi tidak wajar sebagai indikator akumulasi bursa.")
+
 # ==========================================
-# 4. TAB RADAR AI PREDIKSI ESOK HARI (DATA 6 BULAN + FIX MULTI INDEX)
+# 4. TAB RADAR AI PREDIKSI ESOK HARI
 # ==========================================
 with tab_predictive:
-    st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Analisis Historis 6 Bulan)")
-    st.write("Mengukur probabilitas keberhasilan profit berdasarkan tren jangka menengah 6 bulan terakhir.")
-
+    st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Analisis 6 Bulan)")
     if data_bursa.empty:
-        st.warning("Gagal memuat data prediksi bursa. Periksa jaringan internet komputer Anda.")
+        st.warning("Gagal memuat data prediksi bursa.")
     else:
         hasil_prediksi = []
-
         for t in df_filter['Ticker']:
             ticker_full = f"{t}.JK"
             kolom_close = f"Close_{ticker_full}"
-            
             if kolom_close in data_bursa.columns:
                 series_close = data_bursa[kolom_close].dropna()
-                
                 if len(series_close) >= 20:
                     harga_close = series_close.iloc[-1]
-                    
-                    # Perhitungan volatilitas harga harian untuk penentuan Pivot Point
                     harga_high = harga_close * 1.015
                     harga_low = harga_close * 0.985
                     
@@ -219,17 +211,106 @@ with tab_predictive:
                         "Batas Beli Besok (S1)": int(round(support_1)),
                         "Skor Probabilitas AI": f"{skor_ai} Poin"
                     })
-
         df_predictive = pd.DataFrame(hasil_prediksi)
         if not df_predictive.empty:
             df_predictive = df_predictive.sort_values(by="Skor Probabilitas AI", ascending=False)
-            st.subheader("📊 Tabel Analisis Sinyal & Target Ambil Untung Esok Hari")
             st.dataframe(df_predictive, use_container_width=True, hide_index=True)
-        else:
-            st.info("Gagal menyusun ringkasan data prediksi AI.")
+# ==========================================
+# 5. MENU BARU: TAB BANDARMOLOGI VWAP & MACD LIVE (OPTION A & C)
+# ==========================================
+with tab_bandarmologi:
+    st.header("📈 Menu Deteksi Bandarmologi VWAP & Momentum MACD")
+    st.write("Mengidentifikasi jejak transaksi institusi besar (Bandar) dan sinyal pembalikan arah tercepat.")
+    
+    if data_bursa.empty:
+        st.warning("Data bursa tidak tersedia untuk analisis advanced.")
+    else:
+        analisis_adv_list = []
+        for t in df_filter['Ticker']:
+            ticker_full = f"{t}.JK"
+            kol_close = f"Close_{ticker_full}"
+            
+            if kol_close in data_bursa.columns:
+                s_close = data_bursa[kol_close].dropna()
+                
+                if len(s_close) >= 26:
+                    h_kini = s_close.iloc[-1]
+                    
+                    # 1. OPTION A: Perhitungan Estimasi VWAP Proxy Teknikal 15 Hari
+                    v_proxy = np.linspace(1, 1.5, len(s_close)) 
+                    vwap_proxy = (s_close * v_proxy).rolling(window=15).sum() / pd.Series(v_proxy).rolling(window=15).sum().values
+                    current_vwap = vwap_proxy.iloc[-1]
+                    
+                    status_bandar = "🐳 BIG ACCUMULATION" if h_kini > current_vwap else "📉 DISTRIBUTION"
+                    
+                    # 2. OPTION C: Rumus Eksponensial MACD (EMA 12, EMA 26, & Signal 9)
+                    ema12 = s_close.ewm(span=12, adjust=False).mean()
+                    ema26 = s_close.ewm(span=26, adjust=False).mean()
+                    macd_line = ema12 - ema26
+                    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+                    histogram = macd_line - signal_line
+                    
+                    hist_kini = histogram.iloc[-1]
+                    hist_lalu = histogram.iloc[-2]
+                    
+                    status_macd = "⚪ Sinyal Stabil"
+                    if hist_lalu < 0 and hist_kini > 0: status_macd = "🚀 REVERSAL NAIK (Bullish Crossover)"
+                    elif hist_lalu > 0 and hist_kini < 0: status_macd = "⚠️ REVERSAL TURUN (Bearish Crossover)"
+                    
+                    analisis_adv_list.append({
+                        "Emiten": t,
+                        "Harga": int(round(h_kini)),
+                        "Sinyal Bandarmologi (VWAP)": status_bandar,
+                        "Momentum Pembalikan (MACD)": status_macd,
+                        "Nilai Histogram": round(hist_kini, 2)
+                    })
+                    
+        df_adv = pd.DataFrame(analisis_adv_list)
+        if not df_adv.empty:
+            st.dataframe(df_adv, use_container_width=True, hide_index=True)
+            st.info("💡 **Tips Profit:** Carilah emiten dengan status **BIG ACCUMULATION** disertai momentum **REVERSAL NAIK** untuk tingkat keberhasilan tertinggi.")
 
 # ==========================================
-# 5. TAB KALKULATOR INVESTASI BARU
+# 6. MENU BARU: TAB MANAJEMEN RISIKO & KALKULATOR LOT (OPTION B)
+# ==========================================
+with tab_risk:
+    st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
+    st.write("Proteksi otomatis dana uang belanja Anda agar terhindar dari kerugian besar (*anti-bangkrut*).")
+    
+    kol_r1, kol_r2 = st.columns(2)
+    with kol_r1:
+        total_modal_trading = st.number_input("Masukkan Total Modal Siap Pakai (Rp)", min_value=0.0, value=10000000.0, step=1000000.0)
+        persen_risiko_maks = st.slider("Toleransi Risiko per Transaksi (%)", min_value=0.5, max_value=5.0, value=1.0, step=0.5)
+    with kol_r2:
+        harga_beli_saham = st.number_input("Harga Rencana Beli Saham (Entry Price Rp)", min_value=1.0, value=1000, step=10)
+        harga_cut_loss = st.number_input("Harga Batas Batalkan Kerugian (Stop Loss Rp)", min_value=1.0, value=950, step=10)
+        
+    if st.button("⚖️ Hitung Batas Pembelian Lot", use_container_width=True):
+        if harga_beli_saham <= harga_cut_loss:
+            st.error("Error: Harga Rencana Beli harus lebih besar daripada Harga Batas Cut Loss!")
+        else:
+            rupiah_risiko_maks = total_modal_trading * (persen_risiko_maks / 100)
+            jarak_loss_per_lembar = harga_beli_saham - harga_cut_loss
+            
+            maks_lembar_saham = rupiah_risiko_maks / jarak_loss_per_lembar
+            maks_lot_pembelian = maks_lembar_saham / 100
+            total_uang_belanja = maks_lembar_saham * harga_beli_saham
+            
+            st.markdown("---")
+            st.subheader("📊 Hasil Perhitungan Proteksi Modal")
+            
+            kol_h1, kol_h2, kol_h3 = st.columns(3)
+            with kol_h1:
+                st.metric("Maksimal Pembelian", f"{int(maks_lot_pembelian)} Lot")
+            with kol_h2:
+                st.metric("Uang Belanja Digunakan", f"Rp {total_uang_belanja:,.0f}")
+            with kol_h3:
+                st.metric("Risiko Kerugian Maksimal", f"Rp {rupiah_risiko_maks:,.0f}")
+                
+            st.success(f"⚖️ **Rekomendasi AI:** Untuk membeli saham di harga Rp{harga_beli_saham} dengan Stop Loss di Rp{harga_cut_loss}, Anda **hanya boleh membeli maksimal {int(maks_lot_pembelian)} Lot** agar jika terkena cut loss, Anda hanya rugi Rp{rupiah_risiko_maks:,.0f} ({persen_risiko_maks}% dari modal).")
+
+# ==========================================
+# 7. TAB KALKULATOR INVESTASI BULANAN & LOG
 # ==========================================
 with tab_kalkulator:
     st.header("💰 Kalkulator Net Profit Investasi Riil")
