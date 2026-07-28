@@ -33,13 +33,13 @@ sektor_saham = {
     'BBYB': 'Keuangan / Bank Digital', 'BKSL': 'Properti & Real Estate', 'BMRI': 'Keuangan / Perbankan', 
     'BREN': 'Infrastruktur / Energi Hijau', 'BRIS': 'Keuangan / Perbankan Syariah', 'BRMS': 'Barang Baku / Metal', 
     'BRPT': 'Barang Baku / Kimia', 'BSDE': 'Properti & Real Estate', 'BTPS': 'Keuangan / Perbankan', 
-    'BUKA': 'Teknologi / E-Commerce', 'BULL': 'Infrastruktur / Pelayaran', 'BUMI': 'Energi / Batu Bara', 
+    'BUKA': 'Teknoking / E-Commerce', 'BULL': 'Infrastruktur / Pelayaran', 'BUMI': 'Energi / Batu Bara', 
     'BUVA': 'Barang Konsumen Non-Primer', 'CBDK': 'Properti & Real Estate', 'CMRY': 'Barang Konsumen Primer', 
     'CPIN': 'Barang Konsumen Primer', 'CTRA': 'Properti & Real Estate', 'CUAN': 'Energi & Tambang', 
     'DEWA': 'Infrastruktur / Jasa Energi', 'DSNG': 'Barang Konsumen Primer / Sawit', 'DSSA': 'Infrastruktur & Energi', 
     'ELSA': 'Energi / Jasa Migas', 'EMTK': 'Teknologi / Media', 'ENRG': 'Energi / Minyak & Gas', 
     'ERAA': 'Barang Konsumen Non-Primer', 'ESSA': 'Barang Baku / Kimia', 'EXCL': 'Infrastruktur / Telekomunikasi', 
-    'FILM': 'Barang Konsumen Non-Primer', 'GOTO': 'Teknologi / Layanan Digital', 'HEAL': 'Kesehatan / Rumah Hospital', 
+    'FILM': 'Barang Konsumen Non-Primer', 'GOTO': 'Teknologi / Layanan Digital', 'HEAL': 'Kesehatan / Rumah Sakit', 
     'HMSP': 'Barang Konsumen Primer', 'HRTA': 'Barang Konsumen Non-Primer', 'HRUM': 'Energi / Batu Bara & Nikel', 
     'ICBP': 'Barang Konsumen Primer / Pangan', 'IMPC': 'Barang Baku / Bahan Bangunan', 'INCO': 'Barang Baku / Metal', 
     'INDF': 'Barang Konsumen Primer / Pangan', 'INDY': 'Energi & Diversifikasi', 'INET': 'Infrastruktur / Teknologi', 
@@ -120,11 +120,11 @@ with tab_dashboard:
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
         if len(df_global) >= 1:
-            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
+            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
         if len(df_global) >= 2:
-            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc[1]), value=f"{df_global['Harga Kini'].iloc[1]:,.2f}", delta=f"{df_global['Perubahan'].iloc[1]:+.2f}%")
+            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
         if len(df_global) >= 3:
-            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc[2]), value=f"{df_global['Harga Kini'].iloc[2]:,.2f}", delta=f"{df_global['Perubahan'].iloc[2]:+.2f}%")
+            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
     else:
         st.info("ℹ️ Sinyal bursa global macro sedang memuat...")
 
@@ -183,22 +183,20 @@ with tab_dashboard:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MONITOR REAL-TIME (MULTI-TIMEFRAME INTERAKTIF + AKURASI WIB)
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK STYLE TRADINGVIEW PRO (ZONA WAKTU WIB)
 # ==========================================
 with tab_chart:
-    st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI Interaktif")
+    st.header("📊 Grafik Candlestick Pro-Akurasi (TradingView Dark Style)")
     
-    col_input1, col_input2 = st.columns([2, 1])
+    col_input1, col_input2 = st.columns(2)
     with col_input1:
         ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI", key="input_chart_live").strip().upper()
     with col_input2:
-        # INTEGRASI FITUR TIMEFRAME SELECTOR BARU: Pilihan skala harian, mingguan, bulanan, atau real-time menit
         pilihan_tf = st.selectbox("Pilih Timeframe Grafik:", ["Real-Time (Menit)", "Harian (Daily)", "Mingguan (Weekly)", "Bulanan (Monthly)"], index=0)
     
     if ticker_pilihan:
-        with st.spinner("Mengunduh data bursa berdasarkan timeframe pilihan Anda..."):
+        with st.spinner("Mengonfigurasi desain visual chart TradingView..."):
             try:
-                # Menentukan konfigurasi penarikan data bursa yfinance berdasarkan seleksi tombol
                 if pilihan_tf == "Real-Time (Menit)":
                     df_chart_data = yf.download(f"{ticker_pilihan}.JK", period="5d", interval="1m", actions=False)
                 elif pilihan_tf == "Harian (Daily)":
@@ -216,7 +214,6 @@ with tab_chart:
                     if isinstance(df_daily_ref.columns, pd.MultiIndex):
                         df_daily_ref.columns = df_daily_ref.columns.droplevel(1)
                     
-                    # KOORDINASI SINKRONISASI WAKTU WIB: Mengonversi sumbu indeks waktu bursa dari UTC ke Asia/Jakarta (WIB)
                     if df_chart_data.index.tz is None:
                         df_chart_data.index = df_chart_data.index.tz_localize('UTC').tz_convert('Asia/Jakarta')
                     else:
@@ -234,8 +231,9 @@ with tab_chart:
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
                     st.markdown("---")
-                    df_chart_data['MA5'] = df_chart_data['Close'].rolling(window=5).mean()
-                    df_chart_data['MA20'] = df_chart_data['Close'].rolling(window=20).mean()
+                    # RUMUS TRADINGVIEW STANDARD: Garis tren Moving Average Eksponensial (EMA9 & EMA21)
+                    df_chart_data['EMA9'] = df_chart_data['Close'].ewm(span=9, adjust=False).mean()
+                    df_chart_data['EMA21'] = df_chart_data['Close'].ewm(span=21, adjust=False).mean()
                     
                     buy_x = [df_chart_data.index[-5]]  
                     buy_y = [df_chart_data['Low'].iloc[-5]]
@@ -243,20 +241,51 @@ with tab_chart:
                     sell_y = [df_chart_data['High'].iloc[-1]]
                     
                     fig = go.Figure()
-                    fig.add_trace(go.Candlestick(x=df_chart_data.index, open=df_chart_data['Open'], high=df_chart_data['High'], low=df_chart_data['Low'], close=df_chart_data['Close'], name="Candlestick"))
-                    fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['MA5'], line=dict(color='orange', width=1.2), name='MA5 (Fast)'))
-                    fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['MA20'], line=dict(color='blue', width=1.2), name='MA20 (Slow)'))
-                    fig.add_trace(go.Scatter(x=buy_x, y=buy_y, mode='markers', marker=dict(symbol='triangle-up', size=14, color='green'), name='Titik Beli Ideal'))
-                    fig.add_trace(go.Scatter(x=sell_x, y=sell_y, mode='markers', marker=dict(symbol='triangle-down', size=14, color='red'), name='Titik Jual Ideal'))
                     
-                    # FORMAT SUMBU WAKTU: Otomatis menyesuaikan tampilan format jam menit (untuk intraday) atau tanggal biasa (untuk harian/mingguan)
+                    # MODIFIKASI WARNA KHAS TRADINGVIEW: Menggunakan kode hexa resmi bursa internasional
+                    fig.add_trace(go.Candlestick(
+                        x=df_chart_data.index, 
+                        open=df_chart_data['Open'], 
+                        high=df_chart_data['High'], 
+                        low=df_chart_data['Low'], 
+                        close=df_chart_data['Close'], 
+                        name="Candlestick",
+                        increasing_line_color='#089981', decreasing_line_color='#F23645',  # Garis sumbu lilin
+                        increasing_fillcolor='#089981', decreasing_fillcolor='#F23645'    # Badan lilin dalam
+                    ))
+                    
+                    # Garis EMA Standard
+                    fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['EMA9'], line=dict(color='#2962FF', width=1.5), name='EMA 9 (Blue)'))
+                    fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['EMA21'], line=dict(color='#FF6D00', width=1.5), name='EMA 21 (Orange)'))
+                    
+                    fig.add_trace(go.Scatter(x=buy_x, y=buy_y, mode='markers', marker=dict(symbol='triangle-up', size=14, color='#00E676'), name='Titik Beli Ideal'))
+                    fig.add_trace(go.Scatter(x=sell_x, y=sell_y, mode='markers', marker=dict(symbol='triangle-down', size=14, color='#FF1744'), name='Titik Jual Ideal'))
+                    
                     fmt_axis = '%H:%M' if pilihan_tf == "Real-Time (Menit)" else '%Y-%m-%d'
-                    fig.update_layout(title=f"Grafik Fluktuatif {pilihan_tf} Saham {ticker_pilihan}.JK (WIB)", xaxis_rangeslider_visible=False, height=450, xaxis=dict(type='date', tickformat=fmt_axis, title="Waktu Operasional Bursa (WIB)"))
+                    
+                    # TEMA DESAIN GELAP TRADINGVIEW UTUH
+                    fig.update_layout(
+                        title=f"Tren Visual Premium {ticker_pilihan}.JK ({pilihan_tf})", 
+                        xaxis_rangeslider_visible=False, 
+                        height=500,
+                        paper_bgcolor='#131722',  # Warna bingkai luar chart
+                        plot_bgcolor='#131722',   # Warna latar dalam grafik
+                        font=dict(color='#d1d4dc'), # Warna teks label
+                        hovermode='x unified',     # Aktifkan garis penunjuk silang crosshair
+                        xaxis=dict(
+                            type='date', tickformat=fmt_axis, showgrid=True,
+                            gridcolor='#2a2e39', linecolor='#2a2e39', title="Waktu Perdagangan (WIB)"
+                        ),
+                        yaxis=dict(
+                            showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39',
+                            side='right', title="Skala Harga Rupiah" # Menempatkan papan harga di sisi kanan ala TradingView
+                        )
+                    )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.error(f"Gagal memuat data emiten {ticker_pilihan}. Periksa ketersediaan kode bursa.")
+                    st.error(f"Gagal memuat data emiten {ticker_pilihan}.")
             except Exception as e:
-                st.error(f"Hambatan jaringan saat memproses data menit bursa: {str(e)}")
+                st.error(f"Hambatan memproses data bursa: {str(e)}")
 # ==========================================
 # 3. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
 # ==========================================
@@ -415,7 +444,7 @@ with tab_risk:
         
     if st.button("⚖️ Hitung Batas Pembelian Lot & Rasio Profitabilitas", use_container_width=True):
         if harga_beli_saham <= harga_cut_loss or harga_beli_saham >= harga_target_profit:
-            st.error("Error: Konfigurasi tingkatan batasan parameter harga rencana trading salah!")
+            st.error("Error: Konfigurasi parameter batas entry trading Anda terbalik!")
         else:
             rupiah_risiko_maks = total_modal_trading * (persen_risiko_maks / 100)
             jarak_loss_per_lembar = harga_beli_saham - harga_cut_loss
@@ -431,7 +460,7 @@ with tab_risk:
             
             st.markdown("---")
             st.subheader("📊 Hasil Perhitungan Proteksi Modal & Persentase Profitabilitas")
-            kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
+            kol_h1, col_h2, col_h3, col_h4 = st.columns(4)
             with kol_h1: st.metric("Maksimal Pembelian", f"{maks_lot_pembelian} Lot")
             with kol_h2: st.metric("Modal Terpakai", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3: st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%")
@@ -475,4 +504,5 @@ with tab_kalkulator:
     with kol_tombol2:
         if st.button("📄 Tampilkan Semua Riwayat Log Teks", use_container_width=True):
             if os.path.exists("riwayat_performa.txt"):
-                with open("riwayat_performa.txt", "r", encoding="utf-8") as f: st.text_area("Isi File:", value=f.read(), height=250)
+                with open("riwayat_performa.txt", "r", encoding="utf-8") as f:
+                    st.text_area("Isi File:", value=f.read(), height=250)
