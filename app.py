@@ -33,7 +33,7 @@ sektor_saham = {
     'BBYB': 'Keuangan / Bank Digital', 'BKSL': 'Properti & Real Estate', 'BMRI': 'Keuangan / Perbankan', 
     'BREN': 'Infrastruktur / Energi Hijau', 'BRIS': 'Keuangan / Perbankan Syariah', 'BRMS': 'Barang Baku / Metal', 
     'BRPT': 'Barang Baku / Kimia', 'BSDE': 'Properti & Real Estate', 'BTPS': 'Keuangan / Perbankan', 
-    'BUKA': 'Teknoking / E-Commerce', 'BULL': 'Infrastruktur / Pelayaran', 'BUMI': 'Energi / Batu Bara', 
+    'BUKA': 'Teknologi / E-Commerce', 'BULL': 'Infrastruktur / Pelayaran', 'BUMI': 'Energi / Batu Bara', 
     'BUVA': 'Barang Konsumen Non-Primer', 'CBDK': 'Properti & Real Estate', 'CMRY': 'Barang Konsumen Primer', 
     'CPIN': 'Barang Konsumen Primer', 'CTRA': 'Properti & Real Estate', 'CUAN': 'Energi & Tambang', 
     'DEWA': 'Infrastruktur / Jasa Energi', 'DSNG': 'Barang Konsumen Primer / Sawit', 'DSSA': 'Infrastruktur & Energi', 
@@ -91,7 +91,7 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING
+# 1. TAB DASHBOARD SCALPING (FIXED PARSING INDEX ERROR)
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
@@ -119,12 +119,14 @@ with tab_dashboard:
     
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
+        
+        # PERBAIKAN INTEGRASI: Memasukkan nomor baris eksplisit, [1], [2] pada iloc agar terbaca sebagai angka riil
         if len(df_global) >= 1:
-            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
+            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
         if len(df_global) >= 2:
-            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
+            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc[1]), value=f"{df_global['Harga Kini'].iloc[1]:,.2f}", delta=f"{df_global['Perubahan'].iloc[1]:+.2f}%")
         if len(df_global) >= 3:
-            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
+            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc[2]), value=f"{df_global['Harga Kini'].iloc[2]:,.2f}", delta=f"{df_global['Perubahan'].iloc[2]:+.2f}%")
     else:
         st.info("ℹ️ Sinyal bursa global macro sedang memuat...")
 
@@ -231,7 +233,6 @@ with tab_chart:
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
                     st.markdown("---")
-                    # RUMUS TRADINGVIEW STANDARD: Garis tren Moving Average Eksponensial (EMA9 & EMA21)
                     df_chart_data['EMA9'] = df_chart_data['Close'].ewm(span=9, adjust=False).mean()
                     df_chart_data['EMA21'] = df_chart_data['Close'].ewm(span=21, adjust=False).mean()
                     
@@ -241,45 +242,24 @@ with tab_chart:
                     sell_y = [df_chart_data['High'].iloc[-1]]
                     
                     fig = go.Figure()
-                    
-                    # MODIFIKASI WARNA KHAS TRADINGVIEW: Menggunakan kode hexa resmi bursa internasional
                     fig.add_trace(go.Candlestick(
-                        x=df_chart_data.index, 
-                        open=df_chart_data['Open'], 
-                        high=df_chart_data['High'], 
-                        low=df_chart_data['Low'], 
-                        close=df_chart_data['Close'], 
-                        name="Candlestick",
-                        increasing_line_color='#089981', decreasing_line_color='#F23645',  # Garis sumbu lilin
-                        increasing_fillcolor='#089981', decreasing_fillcolor='#F23645'    # Badan lilin dalam
+                        x=df_chart_data.index, open=df_chart_data['Open'], high=df_chart_data['High'], low=df_chart_data['Low'], close=df_chart_data['Close'], name="Candlestick",
+                        increasing_line_color='#089981', decreasing_line_color='#F23645',
+                        increasing_fillcolor='#089981', decreasing_fillcolor='#F23645'
                     ))
                     
-                    # Garis EMA Standard
                     fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['EMA9'], line=dict(color='#2962FF', width=1.5), name='EMA 9 (Blue)'))
                     fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['EMA21'], line=dict(color='#FF6D00', width=1.5), name='EMA 21 (Orange)'))
-                    
                     fig.add_trace(go.Scatter(x=buy_x, y=buy_y, mode='markers', marker=dict(symbol='triangle-up', size=14, color='#00E676'), name='Titik Beli Ideal'))
                     fig.add_trace(go.Scatter(x=sell_x, y=sell_y, mode='markers', marker=dict(symbol='triangle-down', size=14, color='#FF1744'), name='Titik Jual Ideal'))
                     
                     fmt_axis = '%H:%M' if pilihan_tf == "Real-Time (Menit)" else '%Y-%m-%d'
                     
-                    # TEMA DESAIN GELAP TRADINGVIEW UTUH
                     fig.update_layout(
-                        title=f"Tren Visual Premium {ticker_pilihan}.JK ({pilihan_tf})", 
-                        xaxis_rangeslider_visible=False, 
-                        height=500,
-                        paper_bgcolor='#131722',  # Warna bingkai luar chart
-                        plot_bgcolor='#131722',   # Warna latar dalam grafik
-                        font=dict(color='#d1d4dc'), # Warna teks label
-                        hovermode='x unified',     # Aktifkan garis penunjuk silang crosshair
-                        xaxis=dict(
-                            type='date', tickformat=fmt_axis, showgrid=True,
-                            gridcolor='#2a2e39', linecolor='#2a2e39', title="Waktu Perdagangan (WIB)"
-                        ),
-                        yaxis=dict(
-                            showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39',
-                            side='right', title="Skala Harga Rupiah" # Menempatkan papan harga di sisi kanan ala TradingView
-                        )
+                        title=f"Tren Visual Premium {ticker_pilihan}.JK ({pilihan_tf})", xaxis_rangeslider_visible=False, height=500,
+                        paper_bgcolor='#131722', plot_bgcolor='#131722', font=dict(color='#d1d4dc'), hovermode='x unified',
+                        xaxis=dict(type='date', tickformat=fmt_axis, showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', title="Waktu Perdagangan (WIB)"),
+                        yaxis=dict(showgrid=True, gridcolor='#2a2e39', linecolor='#2a2e39', side='right', title="Skala Harga Rupiah")
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
@@ -301,7 +281,7 @@ with tab_sop:
         st.subheader("🛡️ 3. Pengendalian Risiko Ketat (Exit)")
         st.markdown("* **Take Profit:** Amankan keuntungan cepat di kisaran **+1.0% hingga +3.0%**.\n* **Disiplin Cut Loss:** Wajib keluar jika drop maksimal **-2.0%**.")
         st.subheader("🧠 4. Aturan Psikologi Trading")
-        st.markdown("* **Anti-FOMO:** Jangan pernah mengejar saham yang naik >15%.\n* **No Revenge Trading:** Jangan melipatgandakan dana pasca-loss.")
+        st.markdown("* **Anti-FOMO:** Jangan pernah mengejar saham yang naik >15%.\n* **No Revenge Trading:** Jangan melipatgandakan modal setelah menderita kerugian.")
 
 # ==========================================
 # 4. TAB VOLUME SPIKE
@@ -460,7 +440,7 @@ with tab_risk:
             
             st.markdown("---")
             st.subheader("📊 Hasil Perhitungan Proteksi Modal & Persentase Profitabilitas")
-            kol_h1, col_h2, col_h3, col_h4 = st.columns(4)
+            kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
             with kol_h1: st.metric("Maksimal Pembelian", f"{maks_lot_pembelian} Lot")
             with kol_h2: st.metric("Modal Terpakai", f"Rp {total_uang_belanja:,.0f}")
             with kol_h3: st.metric("Perkiraan Loss (%)", f"-{persen_perkiraan_loss:.2f}%")
@@ -504,5 +484,4 @@ with tab_kalkulator:
     with kol_tombol2:
         if st.button("📄 Tampilkan Semua Riwayat Log Teks", use_container_width=True):
             if os.path.exists("riwayat_performa.txt"):
-                with open("riwayat_performa.txt", "r", encoding="utf-8") as f:
-                    st.text_area("Isi File:", value=f.read(), height=250)
+                with open("riwayat_performa.txt", "r", encoding="utf-8") as f: st.text_area("Isi File:", value=f.read(), height=250)
