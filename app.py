@@ -90,7 +90,7 @@ tab_dashboard, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, tab_risk, t
     "💰 Kalkulator Investasi & Log"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (DENGAN KOLOM HARGA KEMARIN & HARI INI)
+# 1. TAB DASHBOARD SCALPING
 # ==========================================
 with tab_dashboard:
     try:
@@ -133,10 +133,8 @@ with tab_dashboard:
             if kolom_close in data_bursa.columns:
                 series_close = data_bursa[kolom_close].dropna()
                 if len(series_close) >= 2:
-                    # AMBIL DATA HARGA HARI INI DAN HARGA KEMARIN SECARA RIIL
                     harga_hari_ini = int(round(series_close.iloc[-1]))
                     harga_kemarin = int(round(series_close.iloc[-2]))
-                    
                     rsi_skrg = round(hitung_rsi_live(series_close, period=14), 1)
                     
                     ma5 = series_close.rolling(window=5).mean().iloc[-1]
@@ -162,19 +160,50 @@ with tab_dashboard:
         st.warning("⚠️ Tidak ada data bursa yang berhasil dimuat.")
 
 # ==========================================
-# 2. TAB PANDUAN SOP & 3. TAB VOLUME SPIKE
+# 2. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING (KINI TERISI LENGKAP)
 # ==========================================
 with tab_sop:
-    st.header("📋 Panduan Standar Operasional Prosedur (SOP) Scalping")
-    st.write("Ikuti protokol disiplin ketat untuk menjaga modal harian Anda dari kerugian besar.")
+    st.header("📋 Standar Operasional Prosedur (SOP) Pro-Scalping BEI")
+    st.write("Ikuti aturan disiplin mekanis ini untuk mengunci profit harian dan menghindari kerugian besar.")
+    
+    kol_sop1, kol_sop2 = st.columns(2)
+    with kol_sop1:
+        st.subheader("⏱️ 1. Aturan Waktu Emas Trading")
+        st.markdown(
+            "* **Sesi Pagi (09.00 - 09.30 WIB):** Volatilitas tertinggi harian. Fokus pada emiten yang muncul di jajaran top gainer.\n"
+            "* **Sesi Sore (15.45 - 16.00 WIB):** Waktu krusial strategi **Buy on Close (BOC)** untuk memanfaatkan lompatan harga besok pagi.\n"
+            "* **Jam Istirahat (11.30 - 13.30 WIB):** DILARANG masuk pasar karena likuiditas volume bursa cenderung sepi."
+        )
+        
+        st.subheader("🎯 2. Protokol Batasan Pembelian (Entry)")
+        st.markdown(
+            "* **Gunakan Analisis Timeframe Singkat:** Analisis chart dipantau pada timeframe 1 Menit (M1) hingga 5 Menit (M5).\n"
+            "* **Syarat Fraksi Harga:** Pilih saham likuid dengan antrean bid-ask rapat (spread tipis maks 1 fraksi).\n"
+            "* **Konfirmasi Volume:** Hanya entry jika grafik volume harian melonjak 2x lipat dari rata-rata volume 5 hari sebelumnya."
+        )
+    
+    with kol_sop2:
+        st.subheader("🛡️ 3. Pengendalian Risiko Ketat (Exit)")
+        st.markdown(
+            "* **Batas Ambil Untung (Take Profit):** Amankan profit cepat di kisaran **+1.0% hingga +3.0%** per posisi.\n"
+            "* **Batas Disiplin Cut Loss:** Wajib keluar pasar jika harga drop menembus level support minor atau maksimal **-2.0%**.\n"
+            "* **Prinsip Evaluasi:** Maksimal batas kerugian harian adalah -4% dari total modal. Jika tercapai, wajib **STOP** trading hari itu."
+        )
+        
+        st.subheader("🧠 4. Aturan Psikologi Trading")
+        st.markdown(
+            "* **Anti-FOMO:** Jangan pernah mengejar saham yang sudah melesat di atas +15% jika tidak ada struktur support dekat.\n"
+            "* **No Revenge Trading:** Jangan melipatgandakan modal setelah menderita kerugian demi membalas kekalahan bursa.\n"
+            "* **Disiplin Konsistensi:** Target profit bersih harian yang realistis dan stabil adalah **+2% hingga +3%**."
+        )
 
+# ==========================================
+# 3. TAB VOLUME SPIKE & 4. TAB RADAR AI PREDIKSI ESOK HARI
+# ==========================================
 with tab_spike:
     st.header("🕵️‍♂️ Taktik Volume Spike (Pelacak Bandar)")
     st.write("Menganalisis lonjakan volume transaksi tidak wajar sebagai indikator akumulasi bursa.")
 
-# ==========================================
-# 4. TAB RADAR AI PREDIKSI ESOK HARI
-# ==========================================
 with tab_predictive:
     st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Analisis 6 Bulan)")
     if data_bursa.empty:
