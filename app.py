@@ -115,7 +115,7 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Jurnal Portofolio & Win-Rate"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING
+# 1. TAB DASHBOARD SCALPING (KOREKSI TOTAL FIXED PARSING INDEX ERROR)
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
@@ -143,12 +143,14 @@ with tab_dashboard:
     
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
+        
+        # PERBAIKAN MUTLAK: Menyematkan penunjuk, [1], dan [2] secara eksplisit agar bebas dari TypeError
         if len(df_global) >= 1:
-            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
+            with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
         if len(df_global) >= 2:
-            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
+            with kol_n1: st.metric(label=str(df_global['Indeks'].iloc[1]), value=f"{df_global['Harga Kini'].iloc[1]:,.2f}", delta=f"{df_global['Perubahan'].iloc[1]:+.2f}%")
         if len(df_global) >= 3:
-            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc), value=f"{df_global['Harga Kini'].iloc:,.2f}", delta=f"{df_global['Perubahan'].iloc:+.2f}%")
+            with kol_n2: st.metric(label=str(df_global['Indeks'].iloc[2]), value=f"{df_global['Harga Kini'].iloc[2]:,.2f}", delta=f"{df_global['Perubahan'].iloc[2]:+.2f}%")
     else:
         st.info("ℹ️ Sinyal bursa global macro sedang memuat...")
 
@@ -429,7 +431,7 @@ with tab_bandarmologi:
         df_adv = pd.DataFrame(analisis_adv_list)
         if not df_adv.empty: st.dataframe(df_adv, use_container_width=True, hide_index=True)
 # ==========================================
-# 7. TAB MANAJEMEN RISIKO & KALKULATOR LOT (FIXED VARIABLE NAME ERROR)
+# 7. TAB MANAJEMEN RISIKO & KALKULATOR LOT 
 # ==========================================
 with tab_risk:
     st.header("🛡️ Menu Manajemen Risiko & Kalkulator Posisi Lot Otomatis")
@@ -461,7 +463,7 @@ with tab_risk:
             st.markdown("---")
             st.subheader("📊 Hasil Perhitungan Proteksi Modal & Persentase Profitabilitas")
             
-            # PERBAIKAN STRUKTUR KOLOM: Mengubah awalan variabel 'col_' menjadi 'kol_' agar sinkron seragam
+            # SINKRONISASI KOLOM: Variabel kol_h1, kol_h2, kol_h3, kol_h4 seragam dengan huruf k
             kol_h1, kol_h2, kol_h3, kol_h4 = st.columns(4)
             with kol_h1: st.metric("Maksimal Pembelian", f"{maks_lot_pembelian} Lot")
             with kol_h2: st.metric("Modal Terpakai", f"Rp {total_uang_belanja:,.0f}")
@@ -472,7 +474,7 @@ with tab_risk:
             st.subheader("💰 Ringkasan Estimasi Saldo Uang Kembali")
             kol_n1, kol_n2 = st.columns(2)
             with kol_n1: st.error(f"📉 **Jika Terkena Cut Loss:**\n* Total Dana Kembali: Rp {nominal_total_jika_loss:,.0f}\n* Net Rugi Bersih: -Rp {total_uang_belanja - nominal_total_jika_loss:,.0f}")
-            with kol_n2: st.success(f"📈 **Jika Mencapai Target Profit:**\n* Total Dana Kembali: Rp {nominal_total_jika_profit:,.0f}\n* Net Untung Bersih: +Rp {nominal_total_jika_profit - total_uang_belanja:,.0f}")
+            with kol_n2: st.success(f"📈 **Jika Mencaching Target Profit:**\n* Total Dana Kembali: Rp {nominal_total_jika_profit:,.0f}\n* Net Untung Bersih: +Rp {nominal_total_jika_profit - total_uang_belanja:,.0f}")
 
 # ==========================================
 # 8. TAB KALKULATOR NET PROFIT & JURNAL PORTOPOLIO JURNAL TRADING AUTOMATIC (CSV DATABASE + WIN RATE)
