@@ -160,7 +160,7 @@ with tab_dashboard:
         st.warning("⚠️ Tidak ada data bursa yang berhasil dimuat.")
 
 # ==========================================
-# 2. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING (KINI TERISI LENGKAP)
+# 2. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
 # ==========================================
 with tab_sop:
     st.header("📋 Standar Operasional Prosedur (SOP) Pro-Scalping BEI")
@@ -174,14 +174,12 @@ with tab_sop:
             "* **Sesi Sore (15.45 - 16.00 WIB):** Waktu krusial strategi **Buy on Close (BOC)** untuk memanfaatkan lompatan harga besok pagi.\n"
             "* **Jam Istirahat (11.30 - 13.30 WIB):** DILARANG masuk pasar karena likuiditas volume bursa cenderung sepi."
         )
-        
         st.subheader("🎯 2. Protokol Batasan Pembelian (Entry)")
         st.markdown(
             "* **Gunakan Analisis Timeframe Singkat:** Analisis chart dipantau pada timeframe 1 Menit (M1) hingga 5 Menit (M5).\n"
             "* **Syarat Fraksi Harga:** Pilih saham likuid dengan antrean bid-ask rapat (spread tipis maks 1 fraksi).\n"
             "* **Konfirmasi Volume:** Hanya entry jika grafik volume harian melonjak 2x lipat dari rata-rata volume 5 hari sebelumnya."
         )
-    
     with kol_sop2:
         st.subheader("🛡️ 3. Pengendalian Risiko Ketat (Exit)")
         st.markdown(
@@ -189,21 +187,65 @@ with tab_sop:
             "* **Batas Disiplin Cut Loss:** Wajib keluar pasar jika harga drop menembus level support minor atau maksimal **-2.0%**.\n"
             "* **Prinsip Evaluasi:** Maksimal batas kerugian harian adalah -4% dari total modal. Jika tercapai, wajib **STOP** trading hari itu."
         )
-        
         st.subheader("🧠 4. Aturan Psikologi Trading")
         st.markdown(
             "* **Anti-FOMO:** Jangan pernah mengejar saham yang sudah melesat di atas +15% jika tidak ada struktur support dekat.\n"
             "* **No Revenge Trading:** Jangan melipatgandakan modal setelah menderita kerugian demi membalas kekalahan bursa.\n"
             "* **Disiplin Konsistensi:** Target profit bersih harian yang realistis dan stabil adalah **+2% hingga +3%**."
         )
-
 # ==========================================
-# 3. TAB VOLUME SPIKE & 4. TAB RADAR AI PREDIKSI ESOK HARI
+# 3. TAB VOLUME SPIKE (ALGORITMA DETEKSI AKUMULASI)
 # ==========================================
 with tab_spike:
-    st.header("🕵️‍♂️ Taktik Volume Spike (Pelacak Bandar)")
-    st.write("Menganalisis lonjakan volume transaksi tidak wajar sebagai indikator akumulasi bursa.")
+    st.header("🕵️‍♂️ Analisis Taktik Volume Spike (Pelacak Jejak Bandar)")
+    st.write("Mendeteksi aktivitas akumulasi tersembunyi berdasarkan rasio lonjakan volume transaksi hari ini dibanding rata-rata 5 hari sebelumnya.")
 
+    if data_bursa.empty:
+        st.warning("Gagal memuat data volume bursa live.")
+    else:
+        analisis_spike_list = []
+        for t in df_filter['Ticker']:
+            ticker_full = f"{t}.JK"
+            kol_vol = f"Volume_{ticker_full}"
+            kol_close = f"Close_{ticker_full}"
+            
+            if kol_vol in data_bursa.columns and kol_close in data_bursa.columns:
+                series_vol = data_bursa[kol_vol].dropna()
+                series_close = data_bursa[kol_close].dropna()
+                
+                if len(series_vol) >= 6:
+                    vol_hari_ini = series_vol.iloc[-1]
+                    rata_vol_5hari = series_vol.iloc[-6:-1].mean()
+                    
+                    if rata_vol_5hari > 0:
+                        rasio_spike = vol_hari_ini / rata_vol_5hari
+                        harga_sekarang = int(round(series_close.iloc[-1]))
+                        
+                        if rasio_spike >= 3.0:
+                            status_spike = "🚨 UNUSUAL SPIKE (Akumulasi Agresif)"
+                        elif rasio_spike >= 1.5:
+                            status_spike = "⚡ Volume Terkonfirmasi (Sedang)"
+                        else:
+                            status_spike = "⚪ Normal"
+                            
+                        analisis_spike_list.append({
+                            "Emiten": t,
+                            "Harga Kini": harga_sekarang,
+                            "Volume Hari Ini": int(vol_hari_ini),
+                            "Rata-rata 5 Hari": int(round(rata_vol_5hari)),
+                            "Rasio Lonjakan": f"{rasio_spike:.2f}x",
+                            "Sinyal Deteksi": status_spike
+                        })
+                        
+        df_spike_view = pd.DataFrame(analisis_spike_list)
+        if not df_spike_view.empty:
+            df_spike_view = df_spike_view.sort_values(by="Rasio Lonjakan", ascending=False)
+            st.subheader("📊 Tabel Deteksi Lonjakan Volume Transaksi Riil")
+            st.dataframe(df_spike_view, use_container_width=True, hide_index=True)
+
+# ==========================================
+# 4. TAB RADAR AI PREDIKSI ESOK HARI
+# ==========================================
 with tab_predictive:
     st.header("🎯 Radar AI Predictive Momentum untuk Esok Hari (Analisis 6 Bulan)")
     if data_bursa.empty:
