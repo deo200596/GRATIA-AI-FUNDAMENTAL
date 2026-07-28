@@ -39,7 +39,7 @@ sektor_saham = {
     'DEWA': 'Infrastruktur / Jasa Energi', 'DSNG': 'Barang Konsumen Primer / Sawit', 'DSSA': 'Infrastruktur & Energi', 
     'ELSA': 'Energi / Jasa Migas', 'EMTK': 'Teknologi / Media', 'ENRG': 'Energi / Minyak & Gas', 
     'ERAA': 'Barang Konsumen Non-Primer', 'ESSA': 'Barang Baku / Kimia', 'EXCL': 'Infrastruktur / Telekomunikasi', 
-    'FILM': 'Barang Konsumen Non-Primer', 'GOTO': 'Teknologi / Layanan Digital', 'HEAL': 'Kesehatan / Rumah Sakit', 
+    'FILM': 'Barang Konsumen Non-Primer', 'GOTO': 'Teknologi / Layanan Digital', 'HEAL': 'Kesehatan / Rumah Hospital', 
     'HMSP': 'Barang Konsumen Primer', 'HRTA': 'Barang Konsumen Non-Primer', 'HRUM': 'Energi / Batu Bara & Nikel', 
     'ICBP': 'Barang Konsumen Primer / Pangan', 'IMPC': 'Barang Baku / Bahan Bangunan', 'INCO': 'Barang Baku / Metal', 
     'INDF': 'Barang Konsumen Primer / Pangan', 'INDY': 'Energi & Diversifikasi', 'INET': 'Infrastruktur / Teknologi', 
@@ -183,58 +183,80 @@ with tab_dashboard:
             st.dataframe(df_dash_view, use_container_width=True, hide_index=True)
 
 # ==========================================
-# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MONITOR REAL-TIME (FIXED VALUE ERROR FORMAT)
+# 2. TAB VISUALISASI GRAFIK CANDLESTICK & MONITOR REAL-TIME (MULTI-TIMEFRAME INTERAKTIF + AKURASI WIB)
 # ==========================================
 with tab_chart:
-    st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI Real-Time")
-    ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI", key="input_chart_live").strip().upper()
+    st.header("📊 Neraca Pergerakan Harga & Grafik Candlestick AI Interaktif")
+    
+    col_input1, col_input2 = st.columns([2, 1])
+    with col_input1:
+        ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI", key="input_chart_live").strip().upper()
+    with col_input2:
+        # INTEGRASI FITUR TIMEFRAME SELECTOR BARU: Pilihan skala harian, mingguan, bulanan, atau real-time menit
+        pilihan_tf = st.selectbox("Pilih Timeframe Grafik:", ["Real-Time (Menit)", "Harian (Daily)", "Mingguan (Weekly)", "Bulanan (Monthly)"], index=0)
     
     if ticker_pilihan:
-        with st.spinner("Mengunduh data bursa real-time terakurat..."):
+        with st.spinner("Mengunduh data bursa berdasarkan timeframe pilihan Anda..."):
             try:
-                df_realtime = yf.download(f"{ticker_pilihan}.JK", period="5d", interval="1m", actions=False)
+                # Menentukan konfigurasi penarikan data bursa yfinance berdasarkan seleksi tombol
+                if pilihan_tf == "Real-Time (Menit)":
+                    df_chart_data = yf.download(f"{ticker_pilihan}.JK", period="5d", interval="1m", actions=False)
+                elif pilihan_tf == "Harian (Daily)":
+                    df_chart_data = yf.download(f"{ticker_pilihan}.JK", period="6mo", interval="1d", actions=False)
+                elif pilihan_tf == "Mingguan (Weekly)":
+                    df_chart_data = yf.download(f"{ticker_pilihan}.JK", period="1y", interval="1wk", actions=False)
+                else:
+                    df_chart_data = yf.download(f"{ticker_pilihan}.JK", period="2y", interval="1mo", actions=False)
+                
                 df_daily_ref = yf.download(f"{ticker_pilihan}.JK", period="5d", interval="1d", actions=False)
                 
-                if not df_realtime.empty and not df_daily_ref.empty:
-                    if isinstance(df_realtime.columns, pd.MultiIndex):
-                        df_realtime.columns = df_realtime.columns.droplevel(1)
+                if not df_chart_data.empty and not df_daily_ref.empty:
+                    if isinstance(df_chart_data.columns, pd.MultiIndex):
+                        df_chart_data.columns = df_chart_data.columns.droplevel(1)
                     if isinstance(df_daily_ref.columns, pd.MultiIndex):
                         df_daily_ref.columns = df_daily_ref.columns.droplevel(1)
                     
-                    harga_real_time = int(round(df_realtime['Close'].iloc[-1]))
-                    harga_sebelumnya = int(round(df_daily_ref['Close'].iloc[-2]))
+                    # KOORDINASI SINKRONISASI WAKTU WIB: Mengonversi sumbu indeks waktu bursa dari UTC ke Asia/Jakarta (WIB)
+                    if df_chart_data.index.tz is None:
+                        df_chart_data.index = df_chart_data.index.tz_localize('UTC').tz_convert('Asia/Jakarta')
+                    else:
+                        df_chart_data.index = df_chart_data.index.tz_convert('Asia/Jakarta')
                     
+                    harga_real_time = int(round(df_chart_data['Close'].iloc[-1]))
+                    harga_sebelumnya = int(round(df_daily_ref['Close'].iloc[-2]))
                     nominal_perubahan = harga_real_time - harga_sebelumnya
                     persen_perubahan = (nominal_perubahan / harga_sebelumnya) * 100
                     
                     st.markdown("### 🔔 Ringkasan Pergerakan Harga Live")
                     col_m1, col_m2, col_m3 = st.columns(3)
-                    with col_m1: st.metric("Harga Kemarin (Previous Close)", f"Rp {harga_sebelumnya:,.0f}")
-                    with col_m2: st.metric("Harga Real-Time Saat Ini", f"Rp {harga_real_time:,.0f}")
-                    
-                    # PERBAIKAN STRUKTUR FORMAT STRING (:+,.0f) AGAR BEBAS DARI VALUE ERROR
-                    with col_m3: st.metric("Perubahan Hari Ini (Fluctuating)", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
+                    with col_m1: st.metric("Harga Sebelumnya (Ref Close)", f"Rp {harga_sebelumnya:,.0f}")
+                    with col_m2: st.metric(f"Harga Kini ({pilihan_tf})", f"Rp {harga_real_time:,.0f}")
+                    with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
                     st.markdown("---")
-                    df_realtime['MA5'] = df_realtime['Close'].rolling(window=5).mean()
-                    df_realtime['MA20'] = df_realtime['Close'].rolling(window=20).mean()
+                    df_chart_data['MA5'] = df_chart_data['Close'].rolling(window=5).mean()
+                    df_chart_data['MA20'] = df_chart_data['Close'].rolling(window=20).mean()
                     
-                    buy_x = [df_realtime.index[-5]]  
-                    buy_y = [df_realtime['Low'].iloc[-5]]
-                    sell_x = [df_realtime.index[-1]] 
-                    sell_y = [df_realtime['High'].iloc[-1]]
+                    buy_x = [df_chart_data.index[-5]]  
+                    buy_y = [df_chart_data['Low'].iloc[-5]]
+                    sell_x = [df_chart_data.index[-1]] 
+                    sell_y = [df_chart_data['High'].iloc[-1]]
                     
                     fig = go.Figure()
-                    fig.add_trace(go.Candlestick(x=df_realtime.index, open=df_realtime['Open'], high=df_realtime['High'], low=df_realtime['Low'], close=df_realtime['Close'], name="Candlestick Menit"))
-                    fig.add_trace(go.Scatter(x=df_realtime.index, y=df_realtime['MA5'], line=dict(color='orange', width=1.2), name='MA5 (Fast)'))
-                    fig.add_trace(go.Scatter(x=df_realtime.index, y=df_realtime['MA20'], line=dict(color='blue', width=1.2), name='MA20 (Slow)'))
+                    fig.add_trace(go.Candlestick(x=df_chart_data.index, open=df_chart_data['Open'], high=df_chart_data['High'], low=df_chart_data['Low'], close=df_chart_data['Close'], name="Candlestick"))
+                    fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['MA5'], line=dict(color='orange', width=1.2), name='MA5 (Fast)'))
+                    fig.add_trace(go.Scatter(x=df_chart_data.index, y=df_chart_data['MA20'], line=dict(color='blue', width=1.2), name='MA20 (Slow)'))
                     fig.add_trace(go.Scatter(x=buy_x, y=buy_y, mode='markers', marker=dict(symbol='triangle-up', size=14, color='green'), name='Titik Beli Ideal'))
                     fig.add_trace(go.Scatter(x=sell_x, y=sell_y, mode='markers', marker=dict(symbol='triangle-down', size=14, color='red'), name='Titik Jual Ideal'))
                     
-                    fig.update_layout(title=f"Grafik Fluktuatif Menit Saham {ticker_pilihan}.JK", xaxis_rangeslider_visible=False, height=450, xaxis=dict(type='date', tickformat='%H:%M', title="Waktu Perdagangan Live"))
+                    # FORMAT SUMBU WAKTU: Otomatis menyesuaikan tampilan format jam menit (untuk intraday) atau tanggal biasa (untuk harian/mingguan)
+                    fmt_axis = '%H:%M' if pilihan_tf == "Real-Time (Menit)" else '%Y-%m-%d'
+                    fig.update_layout(title=f"Grafik Fluktuatif {pilihan_tf} Saham {ticker_pilihan}.JK (WIB)", xaxis_rangeslider_visible=False, height=450, xaxis=dict(type='date', tickformat=fmt_axis, title="Waktu Operasional Bursa (WIB)"))
                     st.plotly_chart(fig, use_container_width=True)
-            except:
-                st.error("Hambatan jaringan saat memproses data real-time.")
+                else:
+                    st.error(f"Gagal memuat data emiten {ticker_pilihan}. Periksa ketersediaan kode bursa.")
+            except Exception as e:
+                st.error(f"Hambatan jaringan saat memproses data menit bursa: {str(e)}")
 # ==========================================
 # 3. TAB PANDUAN STANDAR OPERASIONAL PROSEDUR (SOP) SCALPING
 # ==========================================
@@ -453,4 +475,4 @@ with tab_kalkulator:
     with kol_tombol2:
         if st.button("📄 Tampilkan Semua Riwayat Log Teks", use_container_width=True):
             if os.path.exists("riwayat_performa.txt"):
-                with open("riwayat_performa.txt", "r", encoding="utf-8") as f: f.write(st.text_area("Isi File:", value=f.read(), height=250))
+                with open("riwayat_performa.txt", "r", encoding="utf-8") as f: st.text_area("Isi File:", value=f.read(), height=250)
