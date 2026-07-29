@@ -353,7 +353,7 @@ with tab_spike:
                         rasio_spike = vol_hari_ini / rata_vol_5hari
                         harga_sekarang = int(round(series_close.iloc[-1]))
                         
-                        if rasio_spike >= 3.0: 
+                        if rasio_spike >= 0.1: 
                             status_spike = "🚨 UNUSUAL SPIKE"
                             kirim_alert_telegram(f"⚡ *AI MOMENTUM ALERT* ⚡\n\nEmiten: `{t}`\nHarga Kini: `Rp {harga_sekarang}`\nLonjakan Volume: `{rasio_spike:.2f}x` Lipat!\nStatus: *BIG ACCUMULATION INSTITUSI*")
                         elif rasio_spike >= 1.5: 
