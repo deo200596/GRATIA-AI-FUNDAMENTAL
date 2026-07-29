@@ -260,9 +260,9 @@ with tab_chart:
                     st.markdown("### 🚀 Eksekusi Instan Direct Broker BRIGHTS")
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
-                        st.markdown(f'<a href="https://brights.co.id{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#089981; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🟢 ONE-CLICK BUY via BRIGHTS</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="https://brights.co.id/{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#089981; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🟢 ONE-CLICK BUY via BRIGHTS</button></a>', unsafe_allow_html=True)
                     with col_b2:
-                        st.markdown(f'<a href="https://brights.co.id{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#F23645; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🔴 ONE-CLICK SELL via BRIGHTS</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="https://brights.co.id/{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#F23645; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🔴 ONE-CLICK SELL via BRIGHTS</button></a>', unsafe_allow_html=True)
                     
                     st.markdown("---")
                     df_chart_data['EMA9'] = df_chart_data['Close'].ewm(span=9, adjust=False).mean()
