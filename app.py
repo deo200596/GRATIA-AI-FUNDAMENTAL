@@ -26,10 +26,11 @@ tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", v
 tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password", value="5282255947")
 
 def kirim_alert_telegram(pesan):
-    if tele_token != "DUMMY_TOKEN" and tele_chat_id != "DUMMY_CHAT_ID":
+    if tele_token and tele_chat_id and tele_token != "DUMMY_TOKEN" and tele_chat_id != "DUMMY_CHAT_ID":
         try:
             url = f"https://telegram.org{tele_token}/sendMessage"
-            requests.post(url, data={"chat_id": tele_chat_id, "text": pesan, "parse_mode": "Markdown"}, timeout=5)
+            payload = {"chat_id": str(tele_chat_id), "text": pesan, "parse_mode": "Markdown"}
+            requests.post(url, json=payload, timeout=5)
         except:
             pass
 
@@ -353,7 +354,7 @@ with tab_spike:
                         rasio_spike = vol_hari_ini / rata_vol_5hari
                         harga_sekarang = int(round(series_close.iloc[-1]))
                         
-                        if rasio_spike >= 0.1: 
+                        if rasio_spike >= 0.01: 
                             status_spike = "🚨 UNUSUAL SPIKE"
                             kirim_alert_telegram(f"⚡ *AI MOMENTUM ALERT* ⚡\n\nEmiten: `{t}`\nHarga Kini: `Rp {harga_sekarang}`\nLonjakan Volume: `{rasio_spike:.2f}x` Lipat!\nStatus: *BIG ACCUMULATION INSTITUSI*")
                         elif rasio_spike >= 1.5: 
