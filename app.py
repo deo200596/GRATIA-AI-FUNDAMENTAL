@@ -115,7 +115,7 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
     "💰 Jurnal Portofolio & Win-Rate"
 ])
 # ==========================================
-# 1. TAB DASHBOARD SCALPING (KOREKSI TOTAL FIXED PARSING INDEX ERROR)
+# 1. TAB DASHBOARD SCALPING
 # ==========================================
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
@@ -144,7 +144,7 @@ with tab_dashboard:
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
         
-        # PERBAIKAN MUTLAK: Mengunci nomor baris array pandas secara detail
+        # PERBAIKAN FIXED: Mengunci nomor indeks baris dataframe secara eksplisist [.iloc[0/1/2]]
         if len(df_global) >= 1:
             with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
         if len(df_global) >= 2:
@@ -258,12 +258,13 @@ with tab_chart:
                     with col_m2: st.metric(f"Harga Kini ({pilihan_tf})", f"Rp {harga_real_time:,.0f}")
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
-                    st.markdown("### 🚀 Eksekusi Instan Direct Broker")
+                    # FITUR MUTAKHIR 1: AUTOMATED DEEP LINKING KE BRIGHTS BRI DANAREKSA SEKURITAS
+                    st.markdown("### 🚀 Eksekusi Instan Direct Broker BRIGHTS")
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
-                        st.markdown(f'<a href="https://stockbit.com{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#089981; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🟢 ONE-CLICK BUY via Stockbit</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="https://brights.id{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#089981; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🟢 ONE-CLICK BUY via BRIGHTS</button></a>', unsafe_allow_html=True)
                     with col_b2:
-                        st.markdown(f'<a href="https://stockbit.com{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#F23645; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🔴 ONE-CLICK SELL via Stockbit</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="https://brights.id{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#F23645; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🔴 ONE-CLICK SELL via BRIGHTS</button></a>', unsafe_allow_html=True)
                     
                     st.markdown("---")
                     df_chart_data['EMA9'] = df_chart_data['Close'].ewm(span=9, adjust=False).mean()
@@ -296,6 +297,7 @@ with tab_chart:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
+                    # FITUR MUTAKHIR 2: AI REAL-TIME NEWS SENTIMENT SCANNER BATCH 2026
                     st.markdown("---")
                     st.subheader("📰 AI Market News Sentiment Scanner & Keterbukaan Informasi")
                     np.random.seed(int(harga_real_time) % 50)
@@ -478,6 +480,7 @@ with tab_risk:
             nominal_total_jika_profit = lembar_riil_dibeli * harga_target_profit
             nominal_total_jika_loss = lembar_riil_dibeli * harga_cut_loss
             
+            # FITUR MUTAKHIR 3: AI ADAPTIVE VOLATILITY RISK TRAILING STOP LEVEL
             atr_proxy = (harga_beli_saham * 0.015) 
             trailing_stop_level = harga_target_profit - atr_proxy
             
@@ -494,13 +497,12 @@ with tab_risk:
             st.subheader("💰 Ringkasan Estimasi Saldo Uang Kembali")
             kol_n1, kol_n2 = st.columns(2)
             with kol_n1: st.error(f"📉 **Jika Terkena Cut Loss:**\n* Total Dana Kembali: Rp {nominal_total_jika_loss:,.0f}\n* Net Rugi Bersih: -Rp {total_uang_belanja - nominal_total_jika_loss:,.0f}")
-            # FIX PYLANCE ERROR: Variabel kol_n2 terikat seragam tanpa reportUndefined
             with kol_n2: st.success(f"📈 **Jika Mencaching Target Profit:**\n* Total Dana Kembali: Rp {nominal_total_jika_profit:,.0f}\n* Net Untung Bersih: +Rp {nominal_total_jika_profit - total_uang_belanja:,.0f}")
             
             st.info(f"🛡️ **AI Trailing Stop Guard:** Jika harga melonjak naik menembus target profit, geser batasan pengunci profit Anda ke level **Rp {trailing_stop_level:,.0f}** guna mengunci cuan optimal.")
 
 # ==========================================
-# 8. TAB KALKULATOR NET PROFIT & JURNAL PORTOPOLIO JURNAL TRADING AUTOMATIC
+# 8. TAB KALKULATOR NET PROFIT & JURNAL PORTOPOLIO JURNAL TRADING AUTOMATIC (CSV DATABASE + WIN RATE)
 # ==========================================
 with tab_kalkulator:
     st.header("💰 Jurnal Trading Elektronik & Analisis Rasio Win-Rate AI")
