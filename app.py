@@ -357,7 +357,7 @@ with tab_spike:
                         if rasio_spike >= 0.01: 
                             status_spike = "🚨 UNUSUAL SPIKE"
                             kirim_alert_telegram(f"⚡ *AI MOMENTUM ALERT* ⚡\n\nEmiten: `{t}`\nHarga Kini: `Rp {harga_sekarang}`\nLonjakan Volume: `{rasio_spike:.2f}x` Lipat!\nStatus: *BIG ACCUMULATION INSTITUSI*")
-                        elif rasio_spike >= 1.5: 
+                        elif rasio_spike >= 0.01: 
                             status_spike = "⚡ Volume Terkonfirmasi"
                         else: 
                             status_spike = "⚪ Normal"
