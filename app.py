@@ -22,8 +22,8 @@ if auto_refresh:
 
 # CONFIG INTELLIGENT ALERTS VIA TELEGRAM
 st.sidebar.subheader("🤖 Konfigurasi Telegram Bot Alert")
-tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", value="DUMMY_TOKEN")
-tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password", value="DUMMY_CHAT_ID")
+tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", value="8701590259:AAGQLeMvasnoFIklfhTaHooMlEZfb6idfsg")
+tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password", value="5282255947")
 
 def kirim_alert_telegram(pesan):
     if tele_token != "DUMMY_TOKEN" and tele_chat_id != "DUMMY_CHAT_ID":
