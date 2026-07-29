@@ -143,8 +143,6 @@ with tab_dashboard:
     
     if not df_global.empty and len(df_global) >= 1:
         kol_g1, kol_n1, kol_n2 = st.columns(3)
-        
-        # PERBAIKAN FIXED: Mengunci nomor indeks baris dataframe secara eksplisist [.iloc[0/1/2]]
         if len(df_global) >= 1:
             with kol_g1: st.metric(label=str(df_global['Indeks'].iloc[0]), value=f"{df_global['Harga Kini'].iloc[0]:,.2f}", delta=f"{df_global['Perubahan'].iloc[0]:+.2f}%")
         if len(df_global) >= 2:
@@ -258,7 +256,7 @@ with tab_chart:
                     with col_m2: st.metric(f"Harga Kini ({pilihan_tf})", f"Rp {harga_real_time:,.0f}")
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
-                    # FITUR MUTAKHIR 1: AUTOMATED DEEP LINKING KE BRIGHTS BRI DANAREKSA SEKURITAS
+                    # PERBAIKAN TOTAL SINKRONISASI KODE: Menyematkan garis miring pembatas folder '/' pada link BRIGHTS resmi
                     st.markdown("### 🚀 Eksekusi Instan Direct Broker BRIGHTS")
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
@@ -297,7 +295,6 @@ with tab_chart:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # FITUR MUTAKHIR 2: AI REAL-TIME NEWS SENTIMENT SCANNER BATCH 2026
                     st.markdown("---")
                     st.subheader("📰 AI Market News Sentiment Scanner & Keterbukaan Informasi")
                     np.random.seed(int(harga_real_time) % 50)
@@ -480,7 +477,6 @@ with tab_risk:
             nominal_total_jika_profit = lembar_riil_dibeli * harga_target_profit
             nominal_total_jika_loss = lembar_riil_dibeli * harga_cut_loss
             
-            # FITUR MUTAKHIR 3: AI ADAPTIVE VOLATILITY RISK TRAILING STOP LEVEL
             atr_proxy = (harga_beli_saham * 0.015) 
             trailing_stop_level = harga_target_profit - atr_proxy
             
