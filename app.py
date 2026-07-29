@@ -22,7 +22,7 @@ if auto_refresh:
 
 # CONFIG INTELLIGENT ALERTS VIA TELEGRAM (TERKUNCI PERMANEN)
 st.sidebar.subheader("🤖 Konfigurasi Telegram Bot Alert")
-tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", value="8701590259:AAGQLeMvasnoFIklfhTaHooMlEZfb6idfsg")
+tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", value="8701590259:AAFHOTaWoKMk2qCsReI6RlW76NOLm0dtluo")
 tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password", value="5282255947")
 
 def kirim_alert_telegram(pesan):
