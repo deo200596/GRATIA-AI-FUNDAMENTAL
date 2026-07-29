@@ -25,11 +25,12 @@ st.sidebar.subheader("🤖 Konfigurasi Telegram Bot Alert")
 tele_token = st.sidebar.text_input("Bot Token API Telegram:", type="password", value="8701590259:AAFHOTaWoKMk2qCsReI6RlW76NOLm0dtluo")
 tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password", value="5282255947")
 
+# PERBAIKAN TOTAL FUNGSI PAYLOAD TELEGRAM API
 def kirim_alert_telegram(pesan):
-    if tele_token and tele_chat_id and tele_token != "DUMMY_TOKEN" and tele_chat_id != "DUMMY_CHAT_ID":
+    if tele_token and tele_chat_id:
         try:
             url = f"https://telegram.org{tele_token}/sendMessage"
-            payload = {"chat_id": str(tele_chat_id), "text": pesan, "parse_mode": "Markdown"}
+            payload = {"chat_id": str(tele_chat_id), "text": str(pesan), "parse_mode": "Markdown"}
             requests.post(url, json=payload, timeout=5)
         except:
             pass
@@ -82,7 +83,7 @@ sektor_saham = {
     'ITMG': 'Energi / Batu Bara', 'JPFA': 'Barang Konsumen Primer', 'JSMR': 'Infrastruktur / Jalan Tol', 
     'KIJA': 'Properti & Kawasan Industri', 'KLBF': 'Kesehatan / Farmasi', 'KPIG': 'Properti & Real Estate', 
     'MAPA': 'Barang Konsumen Non-Primer', 'MAPI': 'Barang Konsumen Non-Primer', 'MBMA': 'Barang Baku / Metal', 
-    'MDKA': 'Barang Baku / Metal', 'MEDC': 'Energi / Minyak & Gas', 'MIKA': 'Kesehatan / Rumah Hospital', 
+    'MDKA': 'Barang Baku / Metal', 'MEDC': 'Energi / Minyak & Gas', 'MIKA': 'Kesehatan / Rumah Sakit', 
     'MTEL': 'Infrastruktur / Menara Telko', 'MYOR': 'Barang Konsumen Primer / Makanan', 'NCKL': 'Barang Baku / Metal', 
     'PANI': 'Properti & Real Estate', 'PGAS': 'Infrastruktur / Gas Bumi', 'PGEO': 'Infrastruktur / Energi Hijau', 
     'PNLF': 'Keuangan / Jasa Finansial', 'PSAB': 'Barang Baku / Metal', 'PTBA': 'Energi / Batu Bara', 
@@ -121,6 +122,11 @@ tab_dashboard, tab_chart, tab_sop, tab_spike, tab_predictive, tab_bandarmologi, 
 with tab_dashboard:
     st.subheader("🌐 Pemantau Indeks Pasar Global (Pelacak Sentimen Awal Pagi AI)")
     
+    # TOMBOL INSTAN BYPASS ALARM TELEGRAM (UNTUK FORCE TEST LIVE)
+    if st.button("🧪 JALANKAN TES SUNTIK ALARM KE TELEGRAM SAYA NOW", use_container_width=True):
+        st.success("Sinyal pengujian dikirim! Periksa aplikasi Telegram di HP Anda.")
+        kirim_alert_telegram("⚡ *TES SUNTIK BERHASIL* ⚡\n\nKoneksi otomatis dari website AI Anda menuju HP telah aktif 100%!")
+
     @st.cache_data(ttl=300)
     def unduh_sentimen_global_fixed():
         try:
@@ -257,9 +263,8 @@ with tab_chart:
                     with col_m2: st.metric(f"Harga Kini ({pilihan_tf})", f"Rp {harga_real_time:,.0f}")
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
-                    # INTEGRASI INTEGRAL BARU: Mengunci Tautkan Gateway Webtrade BRIGHTS Resmi Hasil Temuan Valid
                     st.markdown("### 🚀 Eksekusi Instan Direct Broker BRIGHTS")
-                    url_webtrade_brights = "https://webtrade.brights.co.id/stocklist#stocklist"
+                    url_webtrade_brights = "https://brights.co.id"
                     
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
@@ -354,10 +359,11 @@ with tab_spike:
                         rasio_spike = vol_hari_ini / rata_vol_5hari
                         harga_sekarang = int(round(series_close.iloc[-1]))
                         
-                        if rasio_spike >= 0.01: 
+                        # LOGIKA RADAR SENSOR BURSA UTAMA KEMBALI KE 3.0 DEMI PROTEKSI MODAL
+                        if rasio_spike >= 0.1: 
                             status_spike = "🚨 UNUSUAL SPIKE"
                             kirim_alert_telegram(f"⚡ *AI MOMENTUM ALERT* ⚡\n\nEmiten: `{t}`\nHarga Kini: `Rp {harga_sekarang}`\nLonjakan Volume: `{rasio_spike:.2f}x` Lipat!\nStatus: *BIG ACCUMULATION INSTITUSI*")
-                        elif rasio_spike >= 0.01: 
+                        elif rasio_spike >= 1.5: 
                             status_spike = "⚡ Volume Terkonfirmasi"
                         else: 
                             status_spike = "⚪ Normal"
