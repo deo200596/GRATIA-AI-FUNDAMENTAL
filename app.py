@@ -29,7 +29,7 @@ tele_chat_id = st.sidebar.text_input("Telegram Chat ID Target:", type="password"
 def kirim_alert_telegram(pesan):
     if tele_token and tele_chat_id:
         try:
-            url = f"https://telegram.org{tele_token}/sendMessage"
+            url = f"https://api.telegram.org{tele_token}/sendMessage"
             payload = {"chat_id": str(tele_chat_id), "text": str(pesan), "parse_mode": "Markdown"}
             requests.post(url, json=payload, timeout=5)
         except:
