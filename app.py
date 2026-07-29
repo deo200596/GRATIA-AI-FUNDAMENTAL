@@ -81,7 +81,7 @@ sektor_saham = {
     'ITMG': 'Energi / Batu Bara', 'JPFA': 'Barang Konsumen Primer', 'JSMR': 'Infrastruktur / Jalan Tol', 
     'KIJA': 'Properti & Kawasan Industri', 'KLBF': 'Kesehatan / Farmasi', 'KPIG': 'Properti & Real Estate', 
     'MAPA': 'Barang Konsumen Non-Primer', 'MAPI': 'Barang Konsumen Non-Primer', 'MBMA': 'Barang Baku / Metal', 
-    'MDKA': 'Barang Baku / Metal', 'MEDC': 'Energi / Minyak & Gas', 'MIKA': 'Kesehatan / Rumah Sakit', 
+    'MDKA': 'Barang Baku / Metal', 'MEDC': 'Energi / Minyak & Gas', 'MIKA': 'Kesehatan / Rumah Hospital', 
     'MTEL': 'Infrastruktur / Menara Telko', 'MYOR': 'Barang Konsumen Primer / Makanan', 'NCKL': 'Barang Baku / Metal', 
     'PANI': 'Properti & Real Estate', 'PGAS': 'Infrastruktur / Gas Bumi', 'PGEO': 'Infrastruktur / Energi Hijau', 
     'PNLF': 'Keuangan / Jasa Finansial', 'PSAB': 'Barang Baku / Metal', 'PTBA': 'Energi / Batu Bara', 
@@ -216,7 +216,7 @@ with tab_chart:
     with col_input1:
         ticker_pilihan = st.text_input("Ketik Kode Saham BEI (Contoh: BBRI, BBCA, TLKM, GOTO):", value="BBRI", key="input_chart_live").strip().upper()
     with col_input2:
-        pilihan_tf = st.selectbox("Pilih Timeframe Grafik:", ["Real-Time (Menit)", "Harian (Daily)", "Mingguan (Weekly)", "Bulanan (Monthly)"], index=0)
+        pilihan_tf = st.selectbox("Pilihan Timeframe Grafik:", ["Real-Time (Menit)", "Harian (Daily)", "Mingguan (Weekly)", "Bulanan (Monthly)"], index=0)
     
     if ticker_pilihan:
         with st.spinner("Mengonfigurasi desain visual chart TradingView..."):
@@ -256,13 +256,15 @@ with tab_chart:
                     with col_m2: st.metric(f"Harga Kini ({pilihan_tf})", f"Rp {harga_real_time:,.0f}")
                     with col_m3: st.metric("Perubahan Hari Ini", f"Rp {nominal_perubahan:+,.0f}", f"{persen_perubahan:+.2f}%")
                     
-                    # PERBAIKAN TOTAL SINKRONISASI KODE: Menyematkan garis miring pembatas folder '/' pada link BRIGHTS resmi
+                    # INTEGRASI INTEGRAL BARU: Mengunci Tautkan Gateway Webtrade BRIGHTS Resmi Hasil Temuan Valid
                     st.markdown("### 🚀 Eksekusi Instan Direct Broker BRIGHTS")
+                    url_webtrade_brights = "https://webtrade.brights.co.id/stocklist#stocklist"
+                    
                     col_b1, col_b2 = st.columns(2)
                     with col_b1:
-                        st.markdown(f'<a href="https://webtrade.brights.co.id/{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#089981; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🟢 ONE-CLICK BUY via BRIGHTS</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="{url_webtrade_brights}" target="_blank"><button style="width:100%; background-color:#089981; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🟢 ONE-CLICK BUY via BRIGHTS Webtrade</button></a>', unsafe_allow_html=True)
                     with col_b2:
-                        st.markdown(f'<a href="https://webtrade.brights.co.id/{ticker_pilihan}" target="_blank"><button style="width:100%; background-color:#F23645; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🔴 ONE-CLICK SELL via BRIGHTS</button></a>', unsafe_allow_html=True)
+                        st.markdown(f'<a href="{url_webtrade_brights}" target="_blank"><button style="width:100%; background-color:#F23645; color:white; border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer;">🔴 ONE-CLICK SELL via BRIGHTS Webtrade</button></a>', unsafe_allow_html=True)
                     
                     st.markdown("---")
                     df_chart_data['EMA9'] = df_chart_data['Close'].ewm(span=9, adjust=False).mean()
